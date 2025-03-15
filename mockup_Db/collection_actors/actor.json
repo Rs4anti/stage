@@ -1,0 +1,9 @@
+{
+    "_id": "actor_001",
+    "name": "Production Leader",
+    "email": "production.leader@company.com",
+    "role": "Data Controller",
+    "allowed_services": ["service_001", "service_002"],
+    "supply_chain": "Deep-Sea Valves"
+  }
+  

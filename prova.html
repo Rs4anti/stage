@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Diagramma BPMN</title>
+
+    <!-- Includi il CSS di bpmn-js -->
+    <link rel="stylesheet" href="libs/bpmn-js-develop/assets/bpmn-js.css">
+
+</head>
+<body>
+
+    <!-- Contenitore per il diagramma BPMN -->
+    <div id="canvas"></div>
+
+    <!-- Script per caricare la libreria bpmn-js -->
+    <script type="module" src = "libs/bpmn-js-develop/lib/Viewer.js">
+
+        // Il diagramma che vuoi visualizzare
+        const bpmnXML = 'diagram.bpmn';
+      
+        // Istanza di BpmnJS per visualizzare il diagramma
+        const viewer = new Viewer({ container: '#canvas' });
+      
+        // Importa il diagramma BPMN
+        fetch(bpmnXML)
+            .then(response => response.text())
+            .then(xml => {
+                viewer.importXML(xml, (err) => {
+                    if (err) {
+                        console.error('Errore durante importazione del diagramma BPMN:', err);
+                    } else {
+                        viewer.get('canvas').zoom('fit-viewport');
+                    }
+                });
+            })
+            .catch(err => console.error('Errore nel caricamento del file BPMN:', err));
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+    "_id": "policy_001",
+    "service_id": "service_001",
+    "actor_id": "actor_001",
+    "permissions": {
+      "invoke": true,
+      "read": true,
+      "write": false
+    }
+  }
+  
