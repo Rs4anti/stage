@@ -54,16 +54,29 @@
                     </a>
                 </li>
                 <!-- Dropdown Atomic -->
-                <div class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle fw-bold p-2" href="#" role="button" data-bs-toggle="collapse" data-bs-target="#atomicMenu" aria-expanded="false">
-                        Atomic
-                    </a>
-                    <ul id="atomicMenu" class="dropdown-menu collapse">
-                        <li><a class="dropdown-item menu-item" href="#" onclick="setActive(this)" data-input="CustomerID, ProductID, Quantity" data-output="OrderID, Status" data-url="/sales_order">CreateSalesOrder</a></li>
-                        <li><a class="dropdown-item menu-item" href="#" onclick="setActive(this)" data-input="Input 1" data-output="Output 1" data-url="/other_endpoint">Elemento 2</a></li>
-                        <li><a class="dropdown-item menu-item" href="#" onclick="setActive(this)" data-input="Input A" data-output="Output A" data-url="/another_endpoint">Elemento 3</a></li>
-                    </ul>
-                </div>
+<div class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle fw-bold p-2" href="#" role="button" data-bs-toggle="collapse" data-bs-target="#atomicMenu" aria-expanded="false">
+        Atomic
+    </a>
+    <ul id="atomicMenu" class="dropdown-menu collapse">
+        
+        <!-- Process & Monitor -->
+        <li class="dropdown-header">Process & Monitor</li>
+        <li class="ps-3"><a class="dropdown-item menu-item" href="#" onclick="setActive(this)" data-input="CustomerID, ProductID, Quantity" data-output="OrderID, Status" data-url="/sales_order">CreateSalesOrder</a></li>
+        
+        <!-- Collect -->
+        <li class="dropdown-header">Collect</li>
+        <li class="ps-3"><a class="dropdown-item menu-item" href="#" onclick="setActive(this)" data-input="SensorData" data-output="AggregatedData" data-url="/collect_data">CollectData</a></li>
+        
+        <!-- Dispatch -->
+        <li class="dropdown-header">Dispatch</li>
+        <li class="ps-3"><a class="dropdown-item menu-item" href="#" onclick="setActive(this)" data-input="OrderID" data-output="ShipmentID" data-url="/dispatch_order">DispatchOrder</a></li>
+        
+        <!-- Display -->
+        <li class="dropdown-header">Display</li>
+        <li class="ps-3"><a class="dropdown-item menu-item" href="#" onclick="setActive(this)" data-input="DashboardData" data-output="RenderedView" data-url="/display_dashboard">DisplayDashboard</a></li>
+    </ul>
+</div>
 
                 <!-- Dropdown CPPS -->
                 <div class="nav-item dropdown mt-3">
