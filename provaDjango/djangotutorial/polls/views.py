@@ -24,3 +24,7 @@ def crea_articolo(request):
     else:
         form = ArticoloForm()
     return render(request, 'polls/crea_articolo.html', {'form': form})
+
+
+def index(request):
+    return HttpResponse("Hello! Questa è la homepage dei polls.")
