@@ -22,10 +22,6 @@
       "description": "Coordinated scheduling of production orders across multiple suppliers",
       "business_goal": "Ensure timely production planning and execution"
     },
-    "qos_metrics": {
-      "availability": "99.0%",
-      "response_time": "300ms"
-    },
     "security": {
       "rbac_policies": [
         { "actor_id": "actor_001", "permission": "invoke" },

@@ -18,9 +18,9 @@
       "order_id": "integer",
       "status": "string"
     },
-    "qos_metrics": {
-      "availability": "99.9%",
-      "response_time": "200ms"
+    "properties": {
+      "property1": "123",
+      "property2": "ABC"
     },
     "security": {
       "authentication": "OAuth2",
