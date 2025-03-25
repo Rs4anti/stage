@@ -1,5 +1,5 @@
 {
-    "_id": "service_001",
+    "id": "atomic_001",
     "name": "ReceiveSalesOrderData",
     "type": "atomic",
     "category": "collect",
@@ -22,10 +22,8 @@
       "property1": "123",
       "property2": "ABC"
     },
-    "security": {
-      "authentication": "OAuth2",
-      "rbac_role": ["ProductionLeader"]
-    },
+    "rbac_policy": "policy_001",
+    
     "timestamp": {
       "created_at": "2025-03-15T12:00:00Z",
       "updated_at": "2025-03-15T12:30:00Z"
