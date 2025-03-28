@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home - BPMN Designer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .option-card {
+            transition: transform 0.2s;
+        }
+        .option-card:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark p-3">
+        <a class="navbar-brand mx-auto" href="#">BPMN Designer</a>
+    </nav>
+
+    <div class="container text-center mt-5">
+        <h2 class="mb-4">Seleziona un'azione</h2>
+        <div class="row row-cols-1 row-cols-md-2 g-4 justify-content-center">
+            <div class="col">
+                <div class="card option-card shadow p-3">
+                    <div class="card-body">
+                        <h5 class="card-title">📄 Crea un nuovo diagramma</h5>
+                        <p class="card-text">Inizia da zero un nuovo workflow BPMN.</p>
+                        <a href="#" class="btn btn-primary">Inizia</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="card option-card shadow p-3">
+                    <div class="card-body">
+                        <h5 class="card-title">📂 Apri un diagramma esistente</h5>
+                        <p class="card-text">Modifica un progetto salvato in precedenza.</p>
+                        <a href="#" class="btn btn-primary">Apri</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="card option-card shadow p-3">
+                    <div class="card-body">
+                        <h5 class="card-title">📥 Importa un diagramma BPMN</h5>
+                        <p class="card-text">Carica un file BPMN/XML esistente.</p>
+                        <a href="#" class="btn btn-primary">Importa</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="card option-card shadow p-3">
+                    <div class="card-body">
+                        <h5 class="card-title">✔️ Valida il diagramma</h5>
+                        <p class="card-text">Controlla errori e incongruenze nel tuo workflow.</p>
+                        <a href="#" class="btn btn-primary">Valida</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

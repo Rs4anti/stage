@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Editor BPMN Unificato</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <style>
+        body {
+            display: flex;
+        }
+
+        /* Stile sidebar */
+        #sidebar {
+            width: 250px;
+            height: 100vh;
+            position: fixed;
+            left: 0;
+            top: 0;
+            background: #f8f9fa;
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        /* Stile barra superiore */
+        #topbar {
+            position: fixed;
+            top: 0;
+            left: 250px;
+            width: calc(100% - 250px);
+            background: #343a40;
+            color: white;
+            padding: 10px;
+            z-index: 1000;
+        }
+
+        /* Stile area BPMN */
+        #canvas-container {
+            margin-top: 60px;
+            margin-left: 250px;
+            width: calc(100% - 250px);
+            height: calc(100vh - 60px);
+            background: #e9ecef;
+            border: 1px solid #ced4da;
+            position: relative;
+        }
+
+        #canvas {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body class="d-flex flex-column">
+    <!-- Sidebar -->
+    <div id="sidebar" class="d-flex flex-column p-3 border-end">
+        <h5>Livelli data-model</h5>
+        
+        <!-- Dropdown Atomic -->
+        <div class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle fw-bold p-2" href="#" role="button" data-bs-toggle="collapse" data-bs-target="#atomicMenu" aria-expanded="false">
+                Atomic Services
+            </a>
+            <ul id="atomicMenu" class="dropdown-menu collapse">
+                <li><a class="dropdown-item" href="#">Servizio 1</a></li>
+                <li><a class="dropdown-item" href="#">Servizio 2</a></li>
+            </ul>
+        </div>
+
+        <!-- Dropdown CPPS -->
+        <div class="nav-item dropdown mt-3">
+            <a class="nav-link dropdown-toggle fw-bold p-2" href="#" role="button" data-bs-toggle="collapse" data-bs-target="#cppsMenu" aria-expanded="false">
+                CPPS
+            </a>
+            <ul id="cppsMenu" class="dropdown-menu collapse">
+                <li><a class="dropdown-item" href="#">CPPS 1</a></li>
+                <li><a class="dropdown-item" href="#">CPPS 2</a></li>
+            </ul>
+        </div>
+
+        <!-- Dropdown CPPN -->
+        <div class="nav-item dropdown mt-3">
+            <a class="nav-link dropdown-toggle fw-bold p-2" href="#" role="button" data-bs-toggle="collapse" data-bs-target="#cppnMenu" aria-expanded="false">
+                CPPN
+            </a>
+            <ul id="cppnMenu" class="dropdown-menu collapse">
+                <li><a class="dropdown-item" href="#">CPPN A</a></li>
+                <li><a class="dropdown-item" href="#">CPPN B</a></li>
+            </ul>
+        </div>
+    </div>
+    
+    <!-- Barra superiore -->
+    <div id="topbar" class="d-flex justify-content-between align-items-center px-3">
+        <h5 class="mb-0">Editor BPMN</h5>
+        <div>
+            <button class="btn btn-light">Nuovo</button>
+            <button class="btn btn-light">Salva</button>
+            <button class="btn btn-light">Esporta</button>
+            <button class="btn btn-light">Validazione</button>
+        </div>
+    </div>
+    
+    <!-- Area BPMN -->
+    <div id="canvas-container">
+        <div id="canvas"></div>
+    </div>
+
+    <!-- Script per Bootstrap -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Script per BPMN-JS -->
+    <script src="https://unpkg.com/bpmn-js@18.3.1/dist/bpmn-modeler.development.js"></script>
+    <script>
+        var modeler = new BpmnJS({
+            container: '#canvas',
+            keyboard: { bindTo: window }
+        });
+    
+        fetch('diagram.bpmn')
+            .then(response => response.text())
+            .then(xml => modeler.importXML(xml))
+            .then(() => {
+                console.log('Diagramma BPMN caricato con successo');
+                var canvas = modeler.get('canvas');
+                var modeling = modeler.get('modeling');
+                var elementFactory = modeler.get('elementFactory');
+
+                // Aggiungere la palette degli strumenti
+                var palette = modeler.get('palette');
+                palette.open();
+            })
+            .catch(err => console.error('Errore nel caricamento del diagramma BPMN:', err));
+    </script>
+</body>
+</html>
