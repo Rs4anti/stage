@@ -23,4 +23,5 @@ urlpatterns = [
     path("polls/", include("polls.urls")),
     path("", index, name="index"),
     path("chatLLM/", include("chatLLM.urls")),
+    path("bpmn/", include("bpmn.urls"))
 ]

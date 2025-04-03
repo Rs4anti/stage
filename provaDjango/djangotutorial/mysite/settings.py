@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'polls',
     'mysite',
     'chatLLM',
+    'bpmn',
 ]
 
 MIDDLEWARE = [
@@ -77,16 +78,15 @@ WSGI_APPLICATION = 'mysite.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'djongo',
-        'NAME': 'djongoTry',
-        'CLIENT' : {
-            'host' : 'mongodb://localhost:27017'
-        }
-    }
-}
-
+#DATABASES = {
+#    'default': {
+#        'ENGINE': 'djongo',
+#        'NAME': 'djongoTry',
+#        'CLIENT' : {
+#            'host' : 'mongodb://localhost:27017'
+#        }
+#    }
+#}
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
