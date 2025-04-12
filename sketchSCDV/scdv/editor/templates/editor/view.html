@@ -7,44 +7,37 @@
 
   <!-- Bootstrap 5 -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-
-  <!-- bpmn-js styles -->
   <link rel="stylesheet" href="https://unpkg.com/bpmn-js@18.3.1/dist/assets/bpmn-js.css">
   <link rel="stylesheet" href="https://unpkg.com/bpmn-js@18.3.1/dist/assets/diagram-js.css">
   <link rel="stylesheet" href="https://unpkg.com/bpmn-js@18.3.1/dist/assets/bpmn-font/css/bpmn.css">
 
   <style>
-    html, body {
-      height: 100%;
-      margin: 0;
-      padding: 0;
-    }
-    .container-fluid {
-      height: 100vh;
-      overflow: hidden;
-    }
-    #canvas {
-      height: 100%;
-      width: 100%;
-      border: 1px solid #ccc;
-    }
-    .menu-item:hover {
-      background-color: #f0f0f0;
-      cursor: pointer;
-    }
-    .active {
-      background-color: #007bff !important;
-      color: white !important;
-      border-radius: 5px;
-    }
-    #save-button {
-      position: fixed;
-      bottom: 20px;
-      left: 20px;
-      z-index: 1000;
-    }
+    html, body { height: 100%; margin: 0; padding: 0; }
+    .container-fluid { height: 100vh; overflow: hidden; }
+    #canvas { height: 100%; width: 100%; border: 1px solid #ccc; }
+    .menu-item:hover { background-color: #f0f0f0; cursor: pointer; }
+    .active { background-color: #007bff !important; color: white !important; border-radius: 5px; }
+    #save-button { position: fixed; bottom: 20px; left: 20px; z-index: 1000; }
   </style>
+
+  <script>
+    function getCookie(name) {
+      let cookieValue = null;
+      if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+          const trimmed = cookie.trim();
+          if (trimmed.startsWith(name + '=')) {
+            cookieValue = decodeURIComponent(trimmed.substring(name.length + 1));
+            break;
+          }
+        }
+      }
+      return cookieValue;
+    }
+  </script>
 </head>
+
 <body class="bg-light">
   <div class="container-fluid d-flex flex-column">
     <div class="row bg-white shadow-sm p-2">
@@ -53,8 +46,6 @@
         <div>
           <button class="btn btn-outline-secondary btn-sm" onclick="resetDiagram()">Reset</button>
           <button class="btn btn-outline-secondary btn-sm" onclick="exportDiagram()">Save</button>
-          <button class="btn btn-outline-secondary btn-sm">Export</button>
-          <button class="btn btn-outline-secondary btn-sm">Validation</button>
         </div>
       </div>
     </div>
@@ -63,14 +54,13 @@
       <aside class="col-2 bg-white shadow-sm p-3">
         <ul class="nav flex-column">
           <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle fw-bold" href="#" role="button" data-bs-toggle="collapse" data-bs-target="#atomicMenu">Atomic</a>
+            <a class="nav-link dropdown-toggle fw-bold" href="#" data-bs-toggle="collapse" data-bs-target="#atomicMenu">Atomic</a>
             <ul id="atomicMenu" class="collapse show">
-              <li><a class="dropdown-item menu-item active" href="#" onclick="setActive(this)" data-input="CustomerID, ProductID, Quantity" data-output="OrderID, Status" data-url="/sales_order">CreateSalesOrder</a></li>
+              <li><a class="dropdown-item menu-item active" href="#" onclick="setActive(this)">CreateSalesOrder</a></li>
             </ul>
           </li>
         </ul>
       </aside>
-
       <main class="col-10 p-3">
         <div id="canvas"></div>
       </main>
@@ -78,16 +68,9 @@
 
     <footer class="bg-white shadow-sm p-3">
       <h5 class="fw-bold">Details</h5>
-      <div class="d-flex justify-content-between">
-        <span>I/O</span>
-        <span><span>URL:</span> <a id="url-link" href="#" class="ms-2 text-decoration-none text-primary">/sales_order</a></span>
-        <span>RBAC</span>
-      </div>
       <div class="details-section mt-3">
-        <h6>Input</h6>
-        <ul id="input-list"><li>CustomerID</li><li>ProductID</li><li>Quantity</li></ul>
-        <h6>Output</h6>
-        <ul id="output-list"><li>OrderID</li><li>Status</li></ul>
+        <h6>Input</h6><ul id="input-list"></ul>
+        <h6>Output</h6><ul id="output-list"></ul>
       </div>
     </footer>
   </div>
@@ -100,7 +83,7 @@
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title">Configura Atomic Service</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
           <div class="mb-3">
@@ -127,7 +110,6 @@
         </div>
         <div class="modal-footer">
           <button class="btn btn-primary" onclick="saveAtomicServiceData()">Salva</button>
-          <button class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
         </div>
       </div>
     </div>
@@ -139,72 +121,53 @@
   <script src="https://unpkg.com/jquery@3.3.1/dist/jquery.js"></script>
 
   <script>
-    const customPalette = {
-      __init__: ['paletteProvider'],
-      paletteProvider: ['type', function(palette, create, elementFactory) {
-        return {
-          getPaletteEntries() {
-            return {
-              'create.atomic-task': {
-                group: 'activity',
-                className: 'bpmn-icon-task',
-                title: 'Atomic Service',
-                action: {
-                  dragstart: function(event) {
-                    const shape = elementFactory.createShape({
-                      type: 'bpmn:Task',
-                      businessObject: { atomicType: 'atomic' }
-                    });
-                    create.start(event, shape);
-                  },
-                  click: function(event) {
-                    const shape = elementFactory.createShape({
-                      type: 'bpmn:Task',
-                      businessObject: { atomicType: 'atomic' }
-                    });
-                    create.start(event, shape);
-                  }
-                }
-              }
-            };
-          }
-        };
-      }]
-    };
-
-    const bpmnModeler = new BpmnJS({ 
-      container: '#canvas'
-    });
+    const bpmnModeler = new BpmnJS({ container: '#canvas' });
 
     const emptyDiagram = `<?xml version="1.0" encoding="UTF-8"?>
     <bpmn:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                       xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
                       xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
                       xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
-                      id="Definitions_1"
-                      targetNamespace="http://bpmn.io/schema/bpmn">
+                      id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn">
       <bpmn:process id="Process_1" isExecutable="false"/>
       <bpmndi:BPMNDiagram id="BPMNDiagram_1">
         <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Process_1"/>
       </bpmndi:BPMNDiagram>
     </bpmn:definitions>`;
 
+    let diagramId = null; // verrà settato dopo salvataggio
+
     async function openDiagram(xml) {
       try {
         await bpmnModeler.importXML(xml);
         bpmnModeler.get('canvas').zoom('fit-viewport');
       } catch (err) {
-        console.error('Could not import diagram', err);
+        console.error('Errore apertura diagramma', err);
       }
     }
 
     async function exportDiagram() {
       try {
-        const result = await bpmnModeler.saveXML({ format: true });
-        alert('Diagram exported. Check the console.');
-        console.log('DIAGRAM', result.xml);
+        const { xml } = await bpmnModeler.saveXML({ format: true });
+
+        const response = await fetch('/api/save-diagram/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+          },
+          body: JSON.stringify({
+            name: 'Supply Chain Diagram',
+            xml_content: xml
+          })
+        });
+
+        const result = await response.json();
+        diagramId = result.id;
+        alert('Diagramma salvato con successo! ID: ' + result.id);
+        console.log('XML:', xml);
       } catch (err) {
-        console.error('Could not save BPMN diagram', err);
+        console.error('Errore salvataggio', err);
       }
     }
 
@@ -215,35 +178,49 @@
       const bo = element.businessObject;
 
       document.getElementById('serviceName').value = bo.name || '';
-      document.getElementById('inputParams').value = bo.inputParams || '';
-      document.getElementById('outputParams').value = bo.outputParams || '';
+      document.getElementById('inputParams').value = bo.inputParams?.join(', ') || '';
+      document.getElementById('outputParams').value = bo.outputParams?.join(', ') || '';
       document.getElementById('atomicType').value = bo.atomicType || 'collect';
 
-      const modal = new bootstrap.Modal(document.getElementById('atomicServiceModal'));
-      modal.show();
+      new bootstrap.Modal(document.getElementById('atomicServiceModal')).show();
     }
 
-    function saveAtomicServiceData() {
-      if (!currentElement) return;
+    async function saveAtomicServiceData() {
+      if (!currentElement || !diagramId) return;
+
+      const name = document.getElementById('serviceName').value;
+      const atomicType = document.getElementById('atomicType').value;
+      const inputParams = document.getElementById('inputParams').value.split(',').map(s => s.trim());
+      const outputParams = document.getElementById('outputParams').value.split(',').map(s => s.trim());
 
       const modeling = bpmnModeler.get('modeling');
       modeling.updateProperties(currentElement, {
-        name: document.getElementById('serviceName').value,
-        atomicType: document.getElementById('atomicType').value,
-        inputParams: document.getElementById('inputParams').value,
-        outputParams: document.getElementById('outputParams').value
+        name, atomicType, inputParams, outputParams
+      });
+
+      await fetch('/api/save-atomic-service/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+          diagram_id: diagramId,
+          task_id: currentElement.id,
+          name,
+          atomic_type: atomicType,
+          input_params: inputParams,
+          output_params: outputParams
+        })
       });
 
       bootstrap.Modal.getInstance(document.getElementById('atomicServiceModal')).hide();
     }
 
-    // ✅ Gestione click su qualunque task (anche importato)
     bpmnModeler.get('eventBus').on('element.click', function(e) {
       const el = e.element;
       if (el.type === 'bpmn:Task') {
-        if (!el.businessObject.atomicType) {
-          el.businessObject.atomicType = 'atomic';
-        }
+        if (!el.businessObject.atomicType) el.businessObject.atomicType = 'atomic';
         openAtomicServiceForm(el);
       }
     });
