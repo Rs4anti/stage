@@ -1,0 +1,187 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Supply Chain Data View</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- bpmn-js styles -->
+  <link rel="stylesheet" href="https://unpkg.com/bpmn-js@18.3.1/dist/assets/bpmn-js.css">
+  <link rel="stylesheet" href="https://unpkg.com/bpmn-js@18.3.1/dist/assets/diagram-js.css">
+  <link rel="stylesheet" href="https://unpkg.com/bpmn-js@18.3.1/dist/assets/bpmn-font/css/bpmn.css">
+
+  <!-- Custom styles -->
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container-fluid {
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #canvas {
+      height: 100%;
+      width: 100%;
+      border: 1px solid #ccc;
+    }
+
+    .menu-item:hover {
+      background-color: #f0f0f0;
+      cursor: pointer;
+    }
+
+    .active {
+      background-color: #007bff !important;
+      color: white !important;
+      border-radius: 5px;
+    }
+
+    .diagram-note {
+      background-color: rgba(66, 180, 21, 0.7);
+      color: white;
+      border-radius: 5px;
+      font-family: Arial;
+      font-size: 12px;
+      padding: 5px;
+      min-height: 16px;
+      width: 50px;
+      text-align: center;
+    }
+
+    #save-button {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      z-index: 1000;
+    }
+  </style>
+</head>
+<body class="bg-light">
+  <div class="container-fluid d-flex flex-column">
+    <!-- Topbar -->
+    <div class="row bg-white shadow-sm p-2">
+      <div class="col d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Supply Chain Data View editor</h5>
+        <div>
+          <button class="btn btn-outline-secondary btn-sm">New</button>
+          <button class="btn btn-outline-secondary btn-sm">Save</button>
+          <button class="btn btn-outline-secondary btn-sm">Export</button>
+          <button class="btn btn-outline-secondary btn-sm">Validation</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="row flex-grow-1">
+      <!-- Sidebar -->
+      <aside class="col-2 bg-white shadow-sm p-3">
+        <ul class="nav flex-column">
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle fw-bold" href="#" role="button" data-bs-toggle="collapse" data-bs-target="#atomicMenu">Atomic</a>
+            <ul id="atomicMenu" class="collapse show">
+              <li><a class="dropdown-item menu-item active" href="#" onclick="setActive(this)" data-input="CustomerID, ProductID, Quantity" data-output="OrderID, Status" data-url="/sales_order">CreateSalesOrder</a></li>
+            </ul>
+          </li>
+        </ul>
+      </aside>
+
+      <!-- Main Canvas -->
+      <main class="col-10 p-3">
+        <div id="canvas"></div>
+      </main>
+    </div>
+
+    <!-- Details -->
+    <footer class="bg-white shadow-sm p-3">
+      <h5 class="fw-bold">Details</h5>
+      <div class="d-flex justify-content-between">
+        <span>I/O</span>
+        <span><span>URL:</span> <a id="url-link" href="#" class="ms-2 text-decoration-none text-primary">/sales_order</a></span>
+        <span>RBAC</span>
+      </div>
+      <div class="details-section mt-3">
+        <h6>Input</h6>
+        <ul id="input-list"><li>CustomerID</li><li>ProductID</li><li>Quantity</li></ul>
+        <h6>Output</h6>
+        <ul id="output-list"><li>OrderID</li><li>Status</li></ul>
+      </div>
+    </footer>
+  </div>
+
+  <button id="save-button" class="btn btn-primary">Print to console</button>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://unpkg.com/bpmn-js@18.3.1/dist/bpmn-modeler.development.js"></script>
+  <script src="https://unpkg.com/jquery@3.3.1/dist/jquery.js"></script>
+
+  <script>
+    const bpmnModeler = new BpmnJS({
+      container: '#canvas'
+    });
+
+    async function exportDiagram() {
+      try {
+        const result = await bpmnModeler.saveXML({ format: true });
+        alert('Diagram exported. Check the console.');
+        console.log('DIAGRAM', result.xml);
+      } catch (err) {
+        console.error('Could not save BPMN 2.0 diagram', err);
+      }
+    }
+
+    async function openDiagram(xml) {
+      try {
+        await bpmnModeler.importXML(xml);
+        const canvas = bpmnModeler.get('canvas');
+
+        canvas.zoom('fit-viewport');
+
+      } catch (err) {
+        console.error('Could not import BPMN 2.0 diagram', err);
+      }
+    }
+
+    // Carica diagramma di esempio
+    const diagramUrl = 'https://cdn.statically.io/gh/bpmn-io/bpmn-js-examples/dfceecba/starter/diagram.bpmn';
+    $.get(diagramUrl, openDiagram, 'text');
+
+    $('#save-button').click(exportDiagram);
+
+    function setActive(element) {
+      document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('active'));
+      element.classList.add('active');
+
+      const inputList = element.getAttribute('data-input').split(',');
+      const outputList = element.getAttribute('data-output').split(',');
+      const url = element.getAttribute('data-url');
+
+      document.getElementById('url-link').href = url;
+      document.getElementById('url-link').textContent = url;
+
+      const inputEl = document.getElementById('input-list');
+      const outputEl = document.getElementById('output-list');
+      inputEl.innerHTML = ''; outputEl.innerHTML = '';
+
+      inputList.forEach(val => {
+        const li = document.createElement('li');
+        li.textContent = val.trim();
+        inputEl.appendChild(li);
+      });
+
+      outputList.forEach(val => {
+        const li = document.createElement('li');
+        li.textContent = val.trim();
+        outputEl.appendChild(li);
+      });
+    }
+  </script>
+</body>
+</html>
