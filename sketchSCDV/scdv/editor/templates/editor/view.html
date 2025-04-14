@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="it">
 <head>
@@ -5,7 +6,6 @@
   <title>Supply Chain Data View</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <!-- Bootstrap 5 -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/bpmn-js@18.3.1/dist/assets/bpmn-js.css">
   <link rel="stylesheet" href="https://unpkg.com/bpmn-js@18.3.1/dist/assets/diagram-js.css">
@@ -36,8 +36,9 @@
       return cookieValue;
     }
   </script>
-</head>
 
+  <script src="{% static 'js/custom-moddle.js' %}"></script>
+</head>
 <body class="bg-light">
   <div class="container-fluid d-flex flex-column">
     <div class="row bg-white shadow-sm p-2">
@@ -87,11 +88,11 @@
         </div>
         <div class="modal-body">
           <div class="mb-3">
-            <label class="form-label">Nome servizio</label>
+            <label class="form-label">Service name</label>
             <input type="text" class="form-control" id="serviceName">
           </div>
           <div class="mb-3">
-            <label class="form-label">Tipo</label>
+            <label class="form-label">Atomic type</label>
             <select class="form-select" id="atomicType">
               <option value="collect">Collect</option>
               <option value="dispatch">Dispatch</option>
@@ -100,34 +101,39 @@
             </select>
           </div>
           <div class="mb-3">
-            <label class="form-label">Input (virgola separati)</label>
+            <label class="form-label">Input (comma separated)</label>
             <input type="text" class="form-control" id="inputParams">
           </div>
           <div class="mb-3">
-            <label class="form-label">Output (virgola separati)</label>
+            <label class="form-label">Output (comma separated)</label>
             <input type="text" class="form-control" id="outputParams">
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-primary" onclick="saveAtomicServiceData()">Salva</button>
+          <button class="btn btn-primary" onclick="saveAtomicServiceData()">Save</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://unpkg.com/bpmn-js@18.3.1/dist/bpmn-modeler.development.js"></script>
   <script src="https://unpkg.com/jquery@3.3.1/dist/jquery.js"></script>
 
   <script>
-    const bpmnModeler = new BpmnJS({ container: '#canvas' });
+    const bpmnModeler = new BpmnJS({
+      container: '#canvas',
+      moddleExtensions: {
+        custom: customModdle
+      }
+    });
 
     const emptyDiagram = `<?xml version="1.0" encoding="UTF-8"?>
     <bpmn:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                       xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
                       xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
                       xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                      xmlns:custom="http://example.com/custom"
                       id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn">
       <bpmn:process id="Process_1" isExecutable="false"/>
       <bpmndi:BPMNDiagram id="BPMNDiagram_1">
@@ -135,7 +141,8 @@
       </bpmndi:BPMNDiagram>
     </bpmn:definitions>`;
 
-    let diagramId = null; // verrà settato dopo salvataggio
+    let diagramId = null;
+    let currentElement = null;
 
     async function openDiagram(xml) {
       try {
@@ -149,69 +156,62 @@
     async function exportDiagram() {
       try {
         const { xml } = await bpmnModeler.saveXML({ format: true });
-
-        const response = await fetch('/api/save-diagram/', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken')
-          },
-          body: JSON.stringify({
-            name: 'Supply Chain Diagram',
-            xml_content: xml
-          })
-        });
-
-        const result = await response.json();
-        diagramId = result.id;
-        alert('Diagramma salvato con successo! ID: ' + result.id);
-        console.log('XML:', xml);
+        console.log(xml);
+        alert("Diagramma esportato. Vedi console.");
       } catch (err) {
-        console.error('Errore salvataggio', err);
+        console.error('Errore esportazione', err);
       }
     }
-
-    let currentElement = null;
 
     function openAtomicServiceForm(element) {
       currentElement = element;
       const bo = element.businessObject;
 
+      let atomicType = '';
+      let inputParams = '';
+      let outputParams = '';
+
+      if (bo.extensionElements && bo.extensionElements.values.length) {
+        const customExt = bo.extensionElements.values.find(e => e.$type === 'custom:AtomicExtension');
+        if (customExt) {
+          atomicType = customExt.atomicType || '';
+          inputParams = customExt.inputParams || '';
+          outputParams = customExt.outputParams || '';
+        }
+      }
+
       document.getElementById('serviceName').value = bo.name || '';
-      document.getElementById('inputParams').value = bo.inputParams?.join(', ') || '';
-      document.getElementById('outputParams').value = bo.outputParams?.join(', ') || '';
-      document.getElementById('atomicType').value = bo.atomicType || 'collect';
+      document.getElementById('atomicType').value = atomicType;
+      document.getElementById('inputParams').value = inputParams;
+      document.getElementById('outputParams').value = outputParams;
 
       new bootstrap.Modal(document.getElementById('atomicServiceModal')).show();
     }
 
     async function saveAtomicServiceData() {
-      if (!currentElement || !diagramId) return;
+      if (!currentElement) return;
 
       const name = document.getElementById('serviceName').value;
       const atomicType = document.getElementById('atomicType').value;
-      const inputParams = document.getElementById('inputParams').value.split(',').map(s => s.trim());
-      const outputParams = document.getElementById('outputParams').value.split(',').map(s => s.trim());
+      const inputParams = document.getElementById('inputParams').value;
+      const outputParams = document.getElementById('outputParams').value;
 
+      const moddle = bpmnModeler.get('moddle');
       const modeling = bpmnModeler.get('modeling');
-      modeling.updateProperties(currentElement, {
-        name, atomicType, inputParams, outputParams
+
+      const extensionElement = moddle.create('custom:AtomicExtension', {
+        atomicType,
+        inputParams,
+        outputParams
       });
 
-      await fetch('/api/save-atomic-service/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken': getCookie('csrftoken')
-        },
-        body: JSON.stringify({
-          diagram_id: diagramId,
-          task_id: currentElement.id,
-          name,
-          atomic_type: atomicType,
-          input_params: inputParams,
-          output_params: outputParams
-        })
+      const extensionElements = moddle.create('bpmn:ExtensionElements', {
+        values: [extensionElement]
+      });
+
+      modeling.updateProperties(currentElement, {
+        name,
+        extensionElements
       });
 
       bootstrap.Modal.getInstance(document.getElementById('atomicServiceModal')).hide();
@@ -220,7 +220,6 @@
     bpmnModeler.get('eventBus').on('element.click', function(e) {
       const el = e.element;
       if (el.type === 'bpmn:Task') {
-        if (!el.businessObject.atomicType) el.businessObject.atomicType = 'atomic';
         openAtomicServiceForm(el);
       }
     });
