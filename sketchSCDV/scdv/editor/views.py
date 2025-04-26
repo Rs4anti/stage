@@ -3,6 +3,8 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from .models import BPMNDiagram, AtomicService
+from django.views.decorators.csrf import csrf_exempt
+
 
 def data_view_editor(request):
     return render(request, 'editor/view.html')
@@ -16,9 +18,12 @@ def save_diagram(request):
     )
     return Response({'id': diagram.id, 'status': 'saved'})
 
+
 @api_view(['POST'])
 def save_atomic_service(request):
     data = request.data
+
+    print("=== Payload ricevuto:", data)
     try:
         diagram = BPMNDiagram.objects.get(id=data['diagram_id'])
         service, created = AtomicService.objects.update_or_create(
@@ -33,6 +38,7 @@ def save_atomic_service(request):
                 'url': data['url']              
             }
         )
+        print("=== Salvato atomic:", service)
         return Response({'status': 'ok', 'created': created})
     except BPMNDiagram.DoesNotExist:
         return Response({'error': 'Diagram not found'}, status=status.HTTP_404_NOT_FOUND)

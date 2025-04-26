@@ -26,12 +26,17 @@ class AtomicService(models.Model):
     input_params = models.JSONField(default=list)
     output_params = models.JSONField(default=list)
 
-    method = models.CharField(max_length=10, choices=[
+    method = models.CharField(
+    max_length=10,
+    choices=[
         ('GET', 'GET'),
         ('POST', 'POST'),
         ('PUT', 'PUT'),
         ('DELETE', 'DELETE')
-    ])
+    ],
+    default='GET'  # <-- valore di default
+)
+
     url = models.URLField()
 
     def __str__(self):

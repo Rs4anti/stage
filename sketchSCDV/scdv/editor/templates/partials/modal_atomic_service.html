@@ -1,15 +1,19 @@
+<!--{% load static %}-->
 <div class="modal fade" id="atomicServiceModal" tabindex="-1" aria-labelledby="atomicServiceModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
+
         <div class="modal-header">
           <h5 class="modal-title">Configura Atomic Service</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
+
         <div class="modal-body">
           <div class="mb-3">
             <label class="form-label">Service name</label>
             <input type="text" class="form-control" id="serviceName">
           </div>
+
           <div class="mb-3">
             <label class="form-label">Atomic type</label>
             <select class="form-select" id="atomicType">
@@ -19,14 +23,17 @@
               <option value="display">Display</option>
             </select>
           </div>
+
           <div class="mb-3">
             <label class="form-label">Input (comma separated)</label>
             <input type="text" class="form-control" id="inputParams">
           </div>
+
           <div class="mb-3">
             <label class="form-label">Output (comma separated)</label>
             <input type="text" class="form-control" id="outputParams">
           </div>
+
           <div class="mb-3">
             <label class="form-label">HTTP Method</label>
             <select class="form-select" id="httpMethod">
@@ -36,15 +43,113 @@
               <option value="DELETE">DELETE</option>
             </select>
           </div>
+
           <div class="mb-3">
             <label class="form-label">Service URL</label>
             <input type="text" class="form-control" id="serviceUrl">
           </div>
+
         </div>
         <div class="modal-footer">
-          <button class="btn btn-primary" onclick="saveAtomicServiceData()">Save</button>
+          <button class="btn btn-primary" onclick="saveAtomicService()">Save</button>
         </div>
       </div>
     </div>
   </div>
+
+  <script>async function saveAtomicService() {
+
+    console.log('Funzione saveAtomicService chiamata');
+
+    if (!currentElement) {
+      console.log('⚠️ currentElement è nullo');
+      return;
+    }
   
+    const name = document.getElementById('serviceName').value;
+    const atomicType = document.getElementById('atomicType').value;
+    const inputParams = document.getElementById('inputParams').value.split(',').map(s => s.trim());
+    const outputParams = document.getElementById('outputParams').value.split(',').map(s => s.trim());
+    const method = document.getElementById('httpMethod').value;
+    const url = document.getElementById('serviceUrl').value;
+  
+    const csrftoken = getCookie('csrftoken');
+  
+    if (!diagramId) {
+      const { xml } = await bpmnModeler.saveXML({ format: true });
+  
+      const diagramName = prompt("Prima di salvare l'atomic service, inserisci un nome per il diagramma:");
+      if (!diagramName) return;
+  
+      const diagramResponse = await fetch('/api/save-diagram/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrftoken
+        },
+        body: JSON.stringify({
+          name: diagramName,
+          xml_content: xml
+        })
+      });
+  
+      const diagramData = await diagramResponse.json();
+      diagramId = diagramData.id;
+    }
+  
+    const moddle = bpmnModeler.get('moddle');
+    const modeling = bpmnModeler.get('modeling');
+  
+    const extensionElement = moddle.create('custom:AtomicExtension', {
+      atomicType,
+      inputParams: inputParams.join(', '),
+      outputParams: outputParams.join(', '),
+      method,
+      url
+    });
+  
+    const extensionElements = moddle.create('bpmn:ExtensionElements', {
+      values: [extensionElement]
+    });
+  
+    modeling.updateProperties(currentElement, {
+      name,
+      extensionElements
+    });
+  
+    try {
+      const response = await fetch('/api/save-atomic-service/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrftoken
+        },
+        body: JSON.stringify({
+          diagram_id: diagramId,
+          task_id: currentElement.id,
+          name,
+          atomic_type: atomicType,
+          input_params: inputParams,
+          output_params: outputParams,
+          method,
+          url
+        })
+      });
+  
+      const result = await response.json();
+      console.log(result);
+  
+      if (response.ok) {
+        console.log("Atomic service salvato con successo!", result);
+      } else {
+        console.error("Errore salvataggio:", result);
+        alert("Errore durante il salvataggio dell'atomic service.");
+      }
+    } catch (err) {
+      console.error("Errore rete/API:", err);
+      alert("Errore di comunicazione con il server.");
+    }
+  
+    bootstrap.Modal.getInstance(document.getElementById('atomicServiceModal')).hide();
+    window.saveAtomicServiceData = saveAtomicServiceData;
+  }</script>
