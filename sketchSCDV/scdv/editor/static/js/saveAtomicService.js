@@ -2,7 +2,7 @@ async function saveAtomicService() {
     console.log('Funzione saveAtomicService chiamata');
 
     if (!currentElement) {
-        console.log('⚠️ currentElement è nullo');
+        console.log(' currentElement è nullo');
         return;
     }
 
