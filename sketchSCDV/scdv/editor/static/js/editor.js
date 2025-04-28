@@ -132,7 +132,6 @@ function getCookie(name) {
     }
   });
   
-  
   function resetDiagram() {
     openDiagram(emptyDiagram);
   }
