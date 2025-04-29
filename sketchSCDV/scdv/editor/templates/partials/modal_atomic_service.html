@@ -1,61 +1,69 @@
 {% load static %}
 
 <div class="modal fade" id="atomicServiceModal" tabindex="-1" aria-labelledby="atomicServiceModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
 
-        <div class="modal-header">
-          <h5 class="modal-title">Define Atomic Service</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      <div class="modal-header">
+        <h5 class="modal-title">Define Atomic Service</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Service name</label>
+          <input type="text" class="form-control" id="serviceName">
+          <div class="invalid-feedback">Il nome del servizio è obbligatorio.</div>
         </div>
 
-        <div class="modal-body">
-          <div class="mb-3">
-            <label class="form-label">Service name</label>
-            <input type="text" class="form-control" id="serviceName">
-          </div>
-
-          <div class="mb-3">
-            <label class="form-label">Atomic type</label>
-            <select class="form-select" id="atomicType">
-              <option value="collect">Collect</option>
-              <option value="dispatch">Dispatch</option>
-              <option value="process&monitor">Process & Monitor</option>
-              <option value="display">Display</option>
-            </select>
-          </div>
-
-          <div class="mb-3">
-            <label class="form-label">Input (comma separated)</label>
-            <input type="text" class="form-control" id="inputParams">
-          </div>
-
-          <div class="mb-3">
-            <label class="form-label">Output (comma separated)</label>
-            <input type="text" class="form-control" id="outputParams">
-          </div>
-
-          <div class="mb-3">
-            <label class="form-label">HTTP Method</label>
-            <select class="form-select" id="httpMethod">
-              <option value="GET">GET</option>
-              <option value="POST">POST</option>
-              <option value="PUT">PUT</option>
-              <option value="DELETE">DELETE</option>
-            </select>
-          </div>
-
-          <div class="mb-3">
-            <label class="form-label">Service URL</label>
-            <input type="text" class="form-control" id="serviceUrl">
-          </div>
-
+        <div class="mb-3">
+          <label class="form-label">Atomic type</label>
+          <select class="form-select" id="atomicType">
+            <option value="">-- Seleziona --</option>
+            <option value="collect">Collect</option>
+            <option value="dispatch">Dispatch</option>
+            <option value="process&monitor">Process & Monitor</option>
+            <option value="display">Display</option>
+          </select>
+          <div class="invalid-feedback">Seleziona un tipo di atomic service.</div>
         </div>
-        <div class="modal-footer">
-          <button class="btn btn-primary" onclick="saveAtomicService()">Save</button>
+
+        <div class="mb-3">
+          <label class="form-label">Input (comma separated)</label>
+          <input type="text" class="form-control" id="inputParams">
+          <div class="invalid-feedback">Inserisci almeno un parametro di input.</div>
         </div>
+
+        <div class="mb-3">
+          <label class="form-label">Output (comma separated)</label>
+          <input type="text" class="form-control" id="outputParams">
+          <div class="invalid-feedback">Inserisci almeno un parametro di output.</div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">HTTP Method</label>
+          <select class="form-select" id="httpMethod">
+            <option value="">-- Seleziona --</option>
+            <option value="GET">GET</option>
+            <option value="POST">POST</option>
+            <option value="PUT">PUT</option>
+            <option value="DELETE">DELETE</option>
+          </select>
+          <div class="invalid-feedback">Seleziona un metodo HTTP.</div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Service URL</label>
+          <input type="text" class="form-control" id="serviceUrl">
+          <div class="invalid-feedback">L'endpoint deve iniziare con "/" e non contenere spazi.</div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="saveAtomicService()">Save</button>
       </div>
     </div>
+  </div>
 </div>
 
 <script src="{% static 'js/saveAtomicService.js' %}"></script>
