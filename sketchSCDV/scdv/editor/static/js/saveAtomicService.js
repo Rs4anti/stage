@@ -26,8 +26,26 @@ async function saveAtomicService() {
         return;
     }
 
-    // Se diagramId non è definito, salviamo prima il diagramma
-    console.log("Arrivo al check del diagram")
+    const moddle = bpmnModeler.get('moddle');
+    const modeling = bpmnModeler.get('modeling');
+
+    const extensionElement = moddle.create('custom:AtomicExtension', {
+        atomicType,
+        inputParams: inputParams.join(', '),
+        outputParams: outputParams.join(', '),
+        method,
+        url
+    });
+
+    const extensionElements = moddle.create('bpmn:ExtensionElements', {
+        values: [extensionElement]
+    });
+
+    modeling.updateProperties(currentElement, {
+        name,
+        extensionElements
+    });
+
     if (!diagramId) {
         const { xml } = await bpmnModeler.saveXML({ format: true });
 
@@ -50,26 +68,6 @@ async function saveAtomicService() {
         const diagramData = await diagramResponse.json();
         diagramId = diagramData.id; // Assegniamo il diagramId
     }
-
-    const moddle = bpmnModeler.get('moddle');
-    const modeling = bpmnModeler.get('modeling');
-
-    const extensionElement = moddle.create('custom:AtomicExtension', {
-        atomicType,
-        inputParams: inputParams.join(', '),
-        outputParams: outputParams.join(', '),
-        method,
-        url
-    });
-
-    const extensionElements = moddle.create('bpmn:ExtensionElements', {
-        values: [extensionElement]
-    });
-
-    modeling.updateProperties(currentElement, {
-        name,
-        extensionElements
-    });
 
     try {
         // Ora che abbiamo un diagramId valido, possiamo salvare l'atomic service
