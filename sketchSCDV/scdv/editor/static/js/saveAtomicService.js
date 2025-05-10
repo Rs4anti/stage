@@ -2,7 +2,7 @@ async function saveAtomicService() {
     console.log('Funzione saveAtomicService chiamata');
 
     if (!currentElement) {
-        console.log('⚠️ currentElement è nullo');
+        console.log('currentElement è nullo');
         return;
     }
 
@@ -12,6 +12,13 @@ async function saveAtomicService() {
     const outputParams = document.getElementById('outputParams').value.split(',').map(s => s.trim());
     const method = document.getElementById('httpMethod').value;
     const url = document.getElementById('serviceUrl').value;
+
+    console.log('Chiamo validazione campi');
+    // VALIDAZIONE DEI CAMPI
+    if (!validateAtomicServiceFields({ name, atomicType, inputParams, outputParams, method, url })) {
+        return;
+    }
+    console.log('Chiamata validazione campi');
 
     const csrftoken = getCookie('csrftoken');
 
@@ -94,5 +101,50 @@ async function saveAtomicService() {
     }
 
     bootstrap.Modal.getInstance(document.getElementById('atomicServiceModal')).hide();
+
+    const saveAtomicServiceData = {
+        name,
+        atomic_type: atomicType,
+        input_params: inputParams,
+        output_params: outputParams,
+        method,
+        url
+    };
     window.saveAtomicServiceData = saveAtomicServiceData;
+}
+
+
+
+function validateAtomicServiceFields({ name, atomicType, inputParams, outputParams, method, url }) {
+    if (name.trim() === '') {
+        alert("Il nome del servizio è obbligatorio.");
+        return false;
+    }
+
+    if (!atomicType.trim()) {
+        alert("Il tipo atomico è obbligatorio.");
+        return false;
+    }
+
+    if (inputParams.length === 0 || inputParams.every(p => p === '')) {
+        alert("Inserire almeno un parametro di input.");
+        return false;
+    }
+
+    if (outputParams.length === 0 || outputParams.every(p => p === '')) {
+        alert("Inserire almeno un parametro di output.");
+        return false;
+    }
+
+    if (!method.trim()) {
+        alert("Il metodo HTTP è obbligatorio.");
+        return false;
+    }
+
+    if (!url.trim() || !/^\/[a-zA-Z0-9_]+$/.test(url)) { 
+        alert("L'URL è obbligatorio o non valido. Deve iniziare con '/' e contenere solo lettere, numeri o underscore.");
+        return false;
+    }
+    
+    return true;
 }
