@@ -1,8 +1,7 @@
 async function saveAtomicService() {
-    console.log('Funzione saveAtomicService chiamata');
 
     if (!currentElement) {
-        console.log('currentElement è nullo');
+        console.log('⚠️ currentElement è nullo');
         return;
     }
 
@@ -22,7 +21,38 @@ async function saveAtomicService() {
 
     const csrftoken = getCookie('csrftoken');
 
-    // Se diagramId non è definito, salviamo prima il diagramma
+      // VALIDAZIONE
+    if (!name || !atomicType || inputParams.length === 0 || outputParams.length === 0 || !method || !url) {
+        alert("Compila tutti i campi prima di salvare il servizio.");
+        return;
+    }
+
+    const urlPattern = /^\/[a-zA-Z0-9/_\-\.]*$/;
+    if (!urlPattern.test(url)) {
+        alert("Inserisci un URL valido (es: /endpoint).");
+        return;
+    }
+
+    const moddle = bpmnModeler.get('moddle');
+    const modeling = bpmnModeler.get('modeling');
+
+    const extensionElement = moddle.create('custom:AtomicExtension', {
+        atomicType,
+        inputParams: inputParams.join(', '),
+        outputParams: outputParams.join(', '),
+        method,
+        url
+    });
+
+    const extensionElements = moddle.create('bpmn:ExtensionElements', {
+        values: [extensionElement]
+    });
+
+    modeling.updateProperties(currentElement, {
+        name,
+        extensionElements
+    });
+
     if (!diagramId) {
         const { xml } = await bpmnModeler.saveXML({ format: true });
 
@@ -45,26 +75,6 @@ async function saveAtomicService() {
         const diagramData = await diagramResponse.json();
         diagramId = diagramData.id; // Assegniamo il diagramId
     }
-
-    const moddle = bpmnModeler.get('moddle');
-    const modeling = bpmnModeler.get('modeling');
-
-    const extensionElement = moddle.create('custom:AtomicExtension', {
-        atomicType,
-        inputParams: inputParams.join(', '),
-        outputParams: outputParams.join(', '),
-        method,
-        url
-    });
-
-    const extensionElements = moddle.create('bpmn:ExtensionElements', {
-        values: [extensionElement]
-    });
-
-    modeling.updateProperties(currentElement, {
-        name,
-        extensionElements
-    });
 
     try {
         // Ora che abbiamo un diagramId valido, possiamo salvare l'atomic service
@@ -111,40 +121,4 @@ async function saveAtomicService() {
         url
     };
     window.saveAtomicServiceData = saveAtomicServiceData;
-}
-
-
-
-function validateAtomicServiceFields({ name, atomicType, inputParams, outputParams, method, url }) {
-    if (name.trim() === '') {
-        alert("Il nome del servizio è obbligatorio.");
-        return false;
-    }
-
-    if (!atomicType.trim()) {
-        alert("Il tipo atomico è obbligatorio.");
-        return false;
-    }
-
-    if (inputParams.length === 0 || inputParams.every(p => p === '')) {
-        alert("Inserire almeno un parametro di input.");
-        return false;
-    }
-
-    if (outputParams.length === 0 || outputParams.every(p => p === '')) {
-        alert("Inserire almeno un parametro di output.");
-        return false;
-    }
-
-    if (!method.trim()) {
-        alert("Il metodo HTTP è obbligatorio.");
-        return false;
-    }
-
-    if (!url.trim() || !/^\/[a-zA-Z0-9_]+$/.test(url)) { 
-        alert("L'URL è obbligatorio o non valido. Deve iniziare con '/' e contenere solo lettere, numeri o underscore.");
-        return false;
-    }
-    
-    return true;
 }
