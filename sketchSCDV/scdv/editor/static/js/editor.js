@@ -111,9 +111,23 @@ function getCookie(name) {
     new bootstrap.Modal(document.getElementById('atomicServiceModal')).show();
   }
   
+  bpmnModeler.get('eventBus').on('commandStack.shape.create.postExecute', function(e) {
+    
+    const el = e.context.shape;
+
+    console.log('Elemento creato:', el.type);
+
+    if (el.type === 'bpmn:Task') {
+      openAtomicServiceForm(el);
+    }
+  });
+
   bpmnModeler.get('eventBus').on('element.click', function(e) {
     const el = e.element;
-    if (el.type === 'bpmn:Task') {
+  
+    console.log('Elemento cliccato:', el.type);
+  
+    if (el && el.type === 'bpmn:Task') {
       openAtomicServiceForm(el);
     }
   });
