@@ -13,16 +13,12 @@ async function saveAtomicService() {
     const method = document.getElementById('httpMethod').value;
     const url = document.getElementById('serviceUrl').value;
 
-    console.log('Chiamo validazione campi');
-    // VALIDAZIONE DEI CAMPI
     if (!validateAtomicServiceFields({ name, atomicType, inputParams, outputParams, method, url })) {
         return;
     }
-    console.log('Chiamata validazione campi');
 
     const csrftoken = getCookie('csrftoken');
 
-    // Se diagramId non è definito, salviamo prima il diagramma
     if (!diagramId) {
         const { xml } = await bpmnModeler.saveXML({ format: true });
 
