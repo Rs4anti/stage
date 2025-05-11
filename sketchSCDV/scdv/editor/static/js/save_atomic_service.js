@@ -1,3 +1,5 @@
+let diagramId = null;
+
 async function saveAtomicService() {
     console.log('Funzione saveAtomicService chiamata');
 
@@ -18,7 +20,7 @@ async function saveAtomicService() {
     }
 
     const csrftoken = getCookie('csrftoken');
-
+    
     if (!diagramId) {
         const { xml } = await bpmnModeler.saveXML({ format: true });
 
