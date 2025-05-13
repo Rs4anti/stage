@@ -93,4 +93,5 @@ function resetDiagram() {
 }
 
 $('#save-button').click(exportDiagram);
+
 resetDiagram();
