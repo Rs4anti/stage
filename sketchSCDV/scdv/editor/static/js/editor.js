@@ -44,6 +44,7 @@ async function openDiagram(xml) {
   }
 }
 
+
 async function exportDiagram() {
   try {
     const { xml } = await bpmnModeler.saveXML({ format: true });
@@ -54,7 +55,7 @@ async function exportDiagram() {
 
     const csrftoken = getCookie('csrftoken');
 
-    const response = await fetch('/api/save-diagram/', {
+    const response = await fetch('/editor/api/save-diagram/', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

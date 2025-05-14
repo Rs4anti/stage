@@ -1,4 +1,3 @@
-// custom-moddle.js
 const customModdle = {
   name: 'custom',
   uri: 'http://example.com/custom',

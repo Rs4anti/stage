@@ -56,7 +56,7 @@ ROOT_URLCONF = 'scdv.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'scdv' / 'templates'],
+        'DIRS': [BASE_DIR],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [

@@ -1,4 +1,4 @@
-let diagramId = null;
+let diagramId = window.diagramId;
 
 async function saveAtomicService() {
     console.log('Funzione saveAtomicService chiamata');
@@ -27,8 +27,8 @@ async function saveAtomicService() {
         const diagramName = prompt("Prima di salvare l'atomic service, inserisci un nome per il diagramma:");
         if (!diagramName) return;
 
-        // Salvataggio del diagramma
-        const diagramResponse = await fetch('/api/save-diagram/', {
+        // Salvataggio diagramma
+        const diagramResponse = await fetch('/editor/api/save-diagram/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -41,7 +41,7 @@ async function saveAtomicService() {
         });
 
         const diagramData = await diagramResponse.json();
-        diagramId = diagramData.id; // Assegniamo il diagramId
+        diagramId = diagramData.id;
     }
 
     const moddle = bpmnModeler.get('moddle');
@@ -65,15 +65,14 @@ async function saveAtomicService() {
     });
 
     try {
-        // Ora che abbiamo un diagramId valido, possiamo salvare l'atomic service
-        const response = await fetch('/api/save-atomic-service/', {
+        const response = await fetch('/editor/api/save-atomic-service/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': csrftoken
             },
             body: JSON.stringify({
-                diagram_id: diagramId,  // Passiamo il diagramId che ora è valido
+                diagram_id: diagramId, 
                 task_id: currentElement.id,
                 name,
                 atomic_type: atomicType,
