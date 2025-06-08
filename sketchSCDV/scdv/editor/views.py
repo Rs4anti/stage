@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from .models import BPMNDiagram, AtomicService
 from django.views.decorators.csrf import csrf_exempt
-from mongodb_handler import db, atomic_services_collection
+from mongodb_handler import atomic_services_collection
 
 
 def data_view_editor(request):
