@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from .models import BPMNDiagram, AtomicService
 from django.views.decorators.csrf import csrf_exempt
+from mongodb_handler import db, atomic_services_collection
 
 
 def data_view_editor(request):
@@ -22,25 +23,42 @@ def save_diagram(request):
 @api_view(['POST'])
 def save_atomic_service(request):
     data = request.data
-
     print("=== Payload ricevuto:", data)
+
+    required_fields = ['diagram_id', 'task_id', 'name', 'atomic_type', 'input_params', 'output_params', 'method', 'url']
+
+    missing = [f for f in required_fields if f not in data]
+
+    if missing:
+        return Response({'error': f'Missing fields: {", ".join(missing)}'}, status=status.HTTP_400_BAD_REQUEST)    
+
     try:
+        #verifico che diagramma esista
         diagram = BPMNDiagram.objects.get(id=data['diagram_id'])
-        service, created = AtomicService.objects.update_or_create(
-            diagram=diagram,
-            task_id=data['task_id'],
-            defaults={
-                'name': data['name'],
-                'atomic_type': data['atomic_type'],
-                'input_params': data['input_params'],
-                'output_params': data['output_params'],
-                'method': data['method'],       
-                'url': data['url']              
-            }
+
+
+        #salva o aggiorna l'atomic in mongo (basato su activity_id univoco)
+        result = atomic_services_collection.update_one(
+             {'task_id': data['task_id']},
+            {
+                '$set': {
+                    'name': data['name'],
+                    'atomic_type': data['atomic_type'],
+                    'input_params': data['input_params'],
+                    'output_params': data['output_params'],
+                    'method': data['method'],
+                    'url': data['url']
+                }
+            },
+            upsert=True #mix di update e insert
         )
-        print("=== Salvato atomic:", service)
+
+        created = result.upserted_id is not None
+        print("=== Atomic salvato in Mongo. Creato:", created)
+
         return Response({'status': 'ok', 'created': created})
+        
     except BPMNDiagram.DoesNotExist:
-        return Response({'error': 'Diagram not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Diagram not found'}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
