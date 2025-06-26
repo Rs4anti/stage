@@ -87,6 +87,12 @@ bpmnModeler.get('eventBus').on('element.click', function (e) {
   if (el && el.type === 'bpmn:Task') {
     openAtomicServiceForm(el);
   }
+
+  if (el && el.type === 'bpmn:Group') {
+    console.log('thats a group, lets open groups form');
+    openGroupClassificationForm(el);
+  }
+
 });
 
 function resetDiagram() {

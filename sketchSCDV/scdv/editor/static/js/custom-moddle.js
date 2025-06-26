@@ -36,6 +36,19 @@ const customModdle = {
           type: 'String'
         }
       ]
-    }
+    },
+    {
+  name: 'GroupExtension',
+  superClass: ['Element'],
+  properties: [
+    { name: 'groupType', type: 'String' },
+    { name: 'name', type: 'String' },
+    { name: 'description', type: 'String' },
+    { name: 'workflowType', type: 'String' },
+    { name: 'members', type: 'String' }, // CSV o JSON stringificato
+    { name: 'actors', type: 'String' },  // CSV o JSON stringificato
+    { name: 'gdprMap', type: 'String' }  // JSON stringificato
+  ]
+} 
   ]
 };

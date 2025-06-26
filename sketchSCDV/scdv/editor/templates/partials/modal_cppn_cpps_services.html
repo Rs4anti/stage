@@ -1,0 +1,59 @@
+{% load static %}
+
+<div class="modal fade" id="groupTypeModal" tabindex="-1" aria-labelledby="groupTypeModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">CPPN/CPPS Configuration</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label for="groupName" class="form-label">Service Name</label>
+          <input type="text" class="form-control" id="groupName" />
+        </div>
+
+        <div class="mb-3">
+          <label for="groupDescription" class="form-label">Description</label>
+          <textarea class="form-control" id="groupDescription" rows="2"></textarea>
+        </div>
+
+        <div class="mb-3">
+          <label for="groupTypeSelect" class="form-label">Group Type</label>
+          <select class="form-select" id="groupTypeSelect" onchange="toggleCPPNFields()">
+            <option value="CPPS">CPPS</option>
+            <option value="CPPN">CPPN</option>
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label for="workflowTypeSelect" class="form-label">Workflow Type</label>
+          <select class="form-select" id="workflowTypeSelect">
+            <option value="sequence">Sequence</option>
+            <option value="parallel">Parallel</option>
+            <option value="loop">Loop</option>
+            <option value="exclusive">Exclusive</option>
+          </select>
+        </div>
+
+        <div id="cppnFields" style="display: none;">
+          <div class="mb-3">
+            <label for="actorsInvolved" class="form-label">Actors Involved (comma separated)</label>
+            <input type="text" class="form-control" id="actorsInvolved" />
+          </div>
+
+          <div class="mb-3">
+            <label for="gdprMap" class="form-label">GDPR Mapping (JSON)</label>
+            <textarea class="form-control" id="gdprMap" rows="2" placeholder='{"Actor1": "Controller", "Actor2": "Processor"}'></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" onclick="saveGroupClassification()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="{% static 'js/save_cppn_cpps_service.js' %}"></script>

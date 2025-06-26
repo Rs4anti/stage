@@ -2,7 +2,7 @@
 let currentElement = null;
 let isNewTask = false;
 
-// Funzione principale per aprire la modale
+// Funzione principale per aprire la modale di un as
 function openAtomicServiceForm(element, isNew = false) {
 
   if (!element || !element.businessObject) return;

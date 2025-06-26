@@ -23,10 +23,12 @@ def save_diagram(request):
 @api_view(['POST'])
 def save_atomic_service(request):
     data = request.data
-    print("=== Payload ricevuto:", data)
+    print("=== Payload received:", data)
 
     required_fields = ['diagram_id', 'task_id', 'name', 'atomic_type', 'input_params', 'output_params', 'method', 'url']
 
+
+    #TODO: c'è gia validazione in js lato client!! (NON SERVE)
     missing = [f for f in required_fields if f not in data]
 
     if missing:
@@ -37,7 +39,7 @@ def save_atomic_service(request):
         diagram = BPMNDiagram.objects.get(id=data['diagram_id'])
 
 
-        #salva o aggiorna l'atomic in mongo (basato su activity_id univoco)
+        #salva o aggiorna l'atomic in mongo (activity_id univoco)
         result = atomic_services_collection.update_one(
              {'task_id': data['task_id']},
             {
@@ -54,7 +56,7 @@ def save_atomic_service(request):
         )
 
         created = result.upserted_id is not None
-        print("=== Atomic salvato in Mongo. Creato:", created)
+        print("=== Atomic saved in Mongo. created:", created)
 
         return Response({'status': 'ok', 'created': created})
         
