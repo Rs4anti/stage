@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from .models import BPMNDiagram, AtomicService
 from django.views.decorators.csrf import csrf_exempt
-from mongodb_handler import atomic_services_collection
+from mongodb_handler import atomic_services_collection, cpps_collection, cppn_collection
 
 
 def data_view_editor(request):
@@ -63,4 +63,61 @@ def save_atomic_service(request):
     except BPMNDiagram.DoesNotExist:
             return Response({'error': 'Diagram not found'}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+def save_composite_service(request):
+    data = request.data
+    print("=== Payload received (composite):", data)
+
+    required_fields = ['diagram_id', 'group_id', 'group_type', 'name', 'description', 'workflow_type']#, 'members']
+
+    missing = [f for f in required_fields if f not in data]
+
+    if missing:
+        return Response({'error': f'Missing fields: {", ".join(missing)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+    group_type = data['group_type'].upper()
+
+    if group_type not in ['CPPS', 'CPPN']:
+        return Response({'error': 'Invalid group_type: must be CPPS or CPPN'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        # ✅ verifica che il diagramma esista
+        diagram = BPMNDiagram.objects.get(id=data['diagram_id'])
+
+        # 🔍 scegli la collezione Mongo corretta
+        collection = cpps_collection if group_type == 'CPPS' else cppn_collection
+
+        # 🔄 prepara il documento da salvare
+        doc = {
+            'diagram_id': data['diagram_id'],
+            'group_id': data['group_id'],
+            'name': data['name'],
+            'description': data['description'],
+            'workflow_type': data['workflow_type'],
+            #'members': data['members'],
+        }
+
+        if group_type == 'CPPN':
+            doc['actors'] = data.get('actors', [])
+            doc['gdpr_map'] = data.get('gdpr_map', {})
+
+        # 🧾 salva o aggiorna
+        result = collection.update_one(
+            {'group_id': data['group_id']},
+            {'$set': doc},
+            upsert=True
+        )
+
+        created = result.upserted_id is not None
+        print(f"=== Composite service ({group_type}) saved in Mongo. created:", created)
+
+        return Response({'status': 'ok', 'created': created})
+
+    except BPMNDiagram.DoesNotExist:
+        return Response({'error': 'Diagram not found'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        print("!!! Errore API save_composite_service:", e)
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
