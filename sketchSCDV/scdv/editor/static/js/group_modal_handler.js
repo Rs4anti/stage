@@ -34,7 +34,6 @@ function openGroupClassificationForm(element) {
   document.getElementById('workflowTypeSelect').value = workflowType || 'sequence';
   document.getElementById('groupDescription').value = description || '';
   document.getElementById('groupName').value = name || '';
-  document.getElementById('cppsProperties').value = properties || '';
   document.getElementById('singleActor').value = singleActor || detectGroupActors(element)[0] || '';
   document.getElementById('actorsInvolved').value = actors || detectGroupActors(element).join(', ');
   document.getElementById('gdprMap').value = gdprMap || '';

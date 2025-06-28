@@ -105,7 +105,6 @@ def save_composite_service(request):
 
         elif group_type == 'CPPS':
             doc['actor'] = data.get('actor', '')
-            doc['properties'] = data.get('properties', '')
             doc['endpoints'] = data.get('endpoints', [])  # ✅ Aggiunto salvataggio endpoint
 
         # 💾 Inserisce o aggiorna il documento

@@ -8,18 +8,15 @@ async function saveCompositeService() {
 
   const csrftoken = getCookie('csrftoken');
 
-  // 🟨 Raccogli dati dalla modale
   const name = document.getElementById('groupName').value.trim();
   const description = document.getElementById('groupDescription').value.trim();
   const groupType = document.getElementById('groupTypeSelect').value;
   const workflowType = document.getElementById('workflowTypeSelect').value;
 
-  const actor = document.getElementById('singleActor').value.trim();              // CPPS
-  const actors = document.getElementById('actorsInvolved').value.trim();          // CPPN
+  const actor = document.getElementById('singleActor').value.trim();
+  const actors = document.getElementById('actorsInvolved').value.trim();
   const gdprMap = document.getElementById('gdprMap').value.trim();
-  const properties = document.getElementById('cppsProperties').value.trim();
 
-  // 📌 Endpoints
   const endpointRows = document.querySelectorAll('#endpointsContainer > div');
   const endpoints = Array.from(endpointRows).map(row => {
     const method = row.querySelector('select')?.value || '';
@@ -27,7 +24,6 @@ async function saveCompositeService() {
     return { method, url };
   });
 
-  // ✅ Inclusa funzione locale per rilevare i membri
   function detectGroupMembers(groupElement) {
     console.log('detectGroupMembers called');
     const elementRegistry = bpmnModeler.get('elementRegistry');
@@ -48,7 +44,6 @@ async function saveCompositeService() {
       .map(el => el.id);
   }
 
-  // ✅ Inclusa anche funzione bounding box
   function doBoundingBoxesIntersect(a, b) {
     return (
       a.x < b.x + b.width &&
@@ -66,7 +61,6 @@ async function saveCompositeService() {
     return;
   }
 
-  // 🧠 Salva il diagramma se non esiste ancora
   if (!window.diagramId) {
     const { xml } = await bpmnModeler.saveXML({ format: true });
     const diagramName = prompt("Insert a name for the diagram:");
@@ -88,7 +82,6 @@ async function saveCompositeService() {
     window.diagramId = result.id;
   }
 
-  // 📎 Estensione custom su BPMN
   const moddle = bpmnModeler.get('moddle');
   const modeling = bpmnModeler.get('modeling');
 
@@ -101,7 +94,6 @@ async function saveCompositeService() {
     actor: groupType === 'CPPS' ? actor : '',
     actors: groupType === 'CPPN' ? actors : '',
     gdprMap: groupType === 'CPPN' ? gdprMap : '',
-    properties: groupType === 'CPPS' ? properties : '',
     endpoints: groupType === 'CPPS' ? endpoints : []
   });
 
@@ -114,7 +106,6 @@ async function saveCompositeService() {
     extensionElements
   });
 
-  // 💾 Invio al backend
   try {
     const response = await fetch('/editor/api/save-composite-service/', {
       method: 'POST',
@@ -133,7 +124,6 @@ async function saveCompositeService() {
         actor: groupType === 'CPPS' ? actor : '',
         actors: groupType === 'CPPN' ? actors.split(',').map(s => s.trim()) : [],
         gdpr_map: groupType === 'CPPN' && gdprMap ? JSON.parse(gdprMap) : {},
-        properties: groupType === 'CPPS' ? properties : '',
         endpoints: groupType === 'CPPS' ? endpoints : []
       })
     });
