@@ -7,25 +7,10 @@
         <h5 class="modal-title">CPPN/CPPS Configuration</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
       </div>
+
       <div class="modal-body">
-        <div class="mb-3">
-          <label for="groupName" class="form-label">Service Name</label>
-          <input type="text" class="form-control" id="groupName" />
-        </div>
 
-        <div class="mb-3">
-          <label for="groupDescription" class="form-label">Description</label>
-          <textarea class="form-control" id="groupDescription" rows="2"></textarea>
-        </div>
-
-        <div class="mb-3">
-          <label for="groupTypeSelect" class="form-label">Group Type</label>
-          <select class="form-select" id="groupTypeSelect" onchange="toggleCPPNFields()">
-            <option value="CPPS">CPPS</option>
-            <option value="CPPN">CPPN</option>
-          </select>
-        </div>
-
+        <!-- Workflow Type -->
         <div class="mb-3">
           <label for="workflowTypeSelect" class="form-label">Workflow Type</label>
           <select class="form-select" id="workflowTypeSelect">
@@ -36,6 +21,28 @@
           </select>
         </div>
 
+        <!-- Group Type -->
+        <div class="mb-3">
+          <label for="groupTypeSelect" class="form-label">Group Type</label>
+          <select class="form-select" id="groupTypeSelect" onchange="toggleCPPNFields()">
+            <option value="CPPS">CPPS</option>
+            <option value="CPPN">CPPN</option>
+          </select>
+        </div>
+
+        <!-- Description -->
+        <div class="mb-3">
+          <label for="groupDescription" class="form-label">Description</label>
+          <textarea class="form-control" id="groupDescription" rows="2"></textarea>
+        </div>
+
+        <!-- Actor (for CPPS) -->
+        <div class="mb-3" id="cppsActorField">
+          <label for="singleActor" class="form-label">Actor (required for CPPS)</label>
+          <input type="text" class="form-control" id="singleActor" />
+        </div>
+
+        <!-- CPPN-specific fields -->
         <div id="cppnFields" style="display: none;">
           <div class="mb-3">
             <label for="actorsInvolved" class="form-label">Actors Involved (comma separated)</label>
@@ -47,6 +54,29 @@
             <textarea class="form-control" id="gdprMap" rows="2" placeholder='{"Actor1": "Controller", "Actor2": "Processor"}'></textarea>
           </div>
         </div>
+
+        <!-- ===================== -->
+        <!-- 🧩 PROPERTIES SECTION -->
+        <!-- ===================== -->
+        <hr>
+        <h6 class="mb-3 mt-4">Properties</h6>
+
+        <div class="mb-3">
+          <label for="groupName" class="form-label">Service Name</label>
+          <input type="text" class="form-control" id="groupName" />
+        </div>
+
+        <div class="mb-3">
+          <label for="cppsProperties" class="form-label">Properties (free text or JSON)</label>
+          <textarea class="form-control" id="cppsProperties" rows="2" placeholder='e.g., {"priority": "high"}'></textarea>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Endpoints (method + URL)</label>
+          <div id="endpointsContainer"></div>
+          <button type="button" class="btn btn-secondary btn-sm mt-2" onclick="addEndpointRow()">+ Add Endpoint</button>
+        </div>
+
       </div>
 
       <div class="modal-footer">

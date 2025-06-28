@@ -1,119 +1,134 @@
 async function saveCompositeService() {
-    console.log('Function saveCompositeService called');
+  console.log('Function saveCompositeService called');
 
-    if (!currentElement || currentElement.type !== 'bpmn:Group') {
-        alert("no group selected.");
-        return;
-    }
+  if (!currentElement || currentElement.type !== 'bpmn:Group') {
+    alert("no group selected.");
+    return;
+  }
 
-    const csrftoken = getCookie('csrftoken');
+  const csrftoken = getCookie('csrftoken');
 
-    // 🟨 Raccogli dati dalla modale
-    const name = document.getElementById('groupName').value.trim();
-    const description = document.getElementById('groupDescription').value.trim();
-    const groupType = document.getElementById('groupTypeSelect').value;
-    const workflowType = document.getElementById('workflowTypeSelect').value;
-    const actors = document.getElementById('actorsInvolved').value.trim();
-    const gdprMap = document.getElementById('gdprMap').value.trim();
+  // 🟨 Raccogli dati dalla modale
+  const name = document.getElementById('groupName').value.trim();
+  const description = document.getElementById('groupDescription').value.trim();
+  const groupType = document.getElementById('groupTypeSelect').value;
+  const workflowType = document.getElementById('workflowTypeSelect').value;
 
-    const members = detectGroupMembers(currentElement);
-    console.log("Group member's:", members);
+  const actor = document.getElementById('singleActor').value.trim();            // 👈 CPPS
+  const actors = document.getElementById('actorsInvolved').value.trim();        // 👈 CPPN
+  const gdprMap = document.getElementById('gdprMap').value.trim();
 
-    //TODO: validazione ampliambile
-    if (!name) {
-        alert("Composite service's name is mandatory!");
-        return;
-    }
+  const members = detectGroupMembers(currentElement);
+  console.log("Group members:", members);
 
-    // 🧠 Salva il diagramma se non esiste ancora
-    if (!window.diagramId) {
-        const { xml } = await bpmnModeler.saveXML({ format: true });
+  if (!name) {
+    alert("Composite service's name is mandatory!");
+    return;
+  }
 
-        const diagramName = prompt("Insert a name for the diagram:");
-        if (!diagramName) return;
+  if (!window.diagramId) {
+    const { xml } = await bpmnModeler.saveXML({ format: true });
+    const diagramName = prompt("Insert a name for the diagram:");
+    if (!diagramName) return;
 
-        const response = await fetch('/editor/api/save-diagram/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': csrftoken
-            },
-            body: JSON.stringify({
-                name: diagramName,
-                xml_content: xml
-            })
-        });
+    const response = await fetch('/editor/api/save-diagram/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrftoken
+      },
+      body: JSON.stringify({
+        name: diagramName,
+        xml_content: xml
+      })
+    });
 
-        const result = await response.json();
-        window.diagramId = result.id;
-    }
+    const result = await response.json();
+    window.diagramId = result.id;
+  }
 
-    const moddle = bpmnModeler.get('moddle');
-    const modeling = bpmnModeler.get('modeling');
+  const moddle = bpmnModeler.get('moddle');
+  const modeling = bpmnModeler.get('modeling');
 
-    const extensionElement = moddle.create('custom:GroupExtension', {
-        groupType,
+  const extensionElement = moddle.create('custom:GroupExtension', {
+    groupType,
+    name,
+    description,
+    workflowType,
+    members: members.join(','),
+    actors: groupType === 'CPPN' ? actors : '',
+    actor: groupType === 'CPPS' ? actor : '',
+    gdprMap: groupType === 'CPPN' ? gdprMap : ''
+  });
+
+  const extensionElements = moddle.create('bpmn:ExtensionElements', {
+    values: [extensionElement]
+  });
+
+  modeling.updateProperties(currentElement, {
+    name,
+    extensionElements
+  });
+
+  try {
+    const response = await fetch('/editor/api/save-composite-service/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrftoken
+      },
+      body: JSON.stringify({
+        diagram_id: window.diagramId,
+        group_id: currentElement.id,
+        group_type: groupType,
         name,
         description,
-        workflowType,
-        members: members.join(','),
-        actors: groupType === 'CPPN' ? actors : '',
-        gdprMap: groupType === 'CPPN' ? gdprMap : ''
+        workflow_type: workflowType,
+        members,
+        actors: groupType === 'CPPN' ? actors.split(',').map(s => s.trim()) : [],
+        actor: groupType === 'CPPS' ? actor : '',
+        gdpr_map: groupType === 'CPPN' && gdprMap ? JSON.parse(gdprMap) : {}
+      })
     });
 
-    const extensionElements = moddle.create('bpmn:ExtensionElements', {
-        values: [extensionElement]
-    });
+    const result = await response.json();
 
-    modeling.updateProperties(currentElement, {
-        name,
-        extensionElements
-    });
-
-    // Invia al backend
-    try {
-        const response = await fetch('/editor/api/save-composite-service/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': csrftoken
-            },
-            body: JSON.stringify({
-                diagram_id: window.diagramId,
-                group_id: currentElement.id,
-                group_type: groupType,
-                name,
-                description,
-                workflow_type: workflowType,
-                members,
-                actors: actors.split(',').map(s => s.trim()),
-                gdpr_map: gdprMap ? JSON.parse(gdprMap) : {}
-            })
-        });
-
-        const result = await response.json();
-
-        if (response.ok) {
-            console.log("Composite service saved successfully!", result);
-        } else {
-            console.error("Saving error:", result);
-            alert("Error saving composite service.");
-        }
-    } catch (err) {
-        console.error("Errore network/API:", err);
-        alert("Comunication error with server.");
+    if (response.ok) {
+      console.log("Composite service saved successfully!", result);
+    } else {
+      console.error("Saving error:", result);
+      alert("Error saving composite service.");
     }
+  } catch (err) {
+    console.error("Errore network/API:", err);
+    alert("Communication error with server.");
+  }
 
-    bootstrap.Modal.getInstance(document.getElementById('groupTypeModal')).hide();
+  bootstrap.Modal.getInstance(document.getElementById('groupTypeModal')).hide();
 }
+
 
 
 
 function toggleCPPNFields() {
   const type = document.getElementById('groupTypeSelect').value;
+
   const cppnFields = document.getElementById('cppnFields');
-  cppnFields.style.display = type === 'CPPN' ? 'block' : 'none';
+  const cppsActorField = document.getElementById('cppsActorField');
+  const cppsPropertiesField = document.getElementById('cppsPropertiesField');
+
+  if (type === 'CPPN') {
+    cppnFields.style.display = 'block';
+    cppsActorField.style.display = 'none';
+    cppsPropertiesField.style.display = 'none';
+  } else {
+    cppnFields.style.display = 'none';
+    cppsActorField.style.display = 'block';
+    cppsPropertiesField.style.display = 'block';
+  }
 }
+
+
 
 
 // TODO: verifica funzionamento! rilevazione automatica se cppn o cpps
