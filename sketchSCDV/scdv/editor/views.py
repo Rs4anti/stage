@@ -125,3 +125,74 @@ def save_composite_service(request):
         print("!!! Errore API save_composite_service:", e)
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
+@api_view(['POST'])
+def save_cppn_service(request):
+    data = request.data
+    required_fields = ['diagram_id', 'group_id', 'name', 'description', 'workflow_type', 'members', 'actors', 'gdpr_map']
+
+    missing = [f for f in required_fields if f not in data]
+    if missing:
+        return Response({'error': f'Missing fields: {", ".join(missing)}'}, status=400)
+
+    try:
+        diagram = BPMNDiagram.objects.get(id=data['diagram_id'])
+
+        doc = {
+            'diagram_id': data['diagram_id'],
+            'group_id': data['group_id'],
+            'name': data['name'],
+            'description': data['description'],
+            'workflow_type': data['workflow_type'],
+            'members': data['members'],
+            'actors': data['actors'],
+            'gdpr_map': data['gdpr_map']
+        }
+
+        result = cppn_collection.update_one(
+            {'group_id': data['group_id']},
+            {'$set': doc},
+            upsert=True
+        )
+
+        return Response({'status': 'ok', 'created': result.upserted_id is not None})
+    except BPMNDiagram.DoesNotExist:
+        return Response({'error': 'Diagram not found'}, status=404)
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
+
+
+@api_view(['POST'])
+def save_cpps_service(request):
+    data = request.data
+    required_fields = ['diagram_id', 'group_id', 'name', 'description', 'workflow_type', 'members', 'actor', 'endpoints']
+
+    missing = [f for f in required_fields if f not in data]
+    if missing:
+        return Response({'error': f'Missing fields: {", ".join(missing)}'}, status=400)
+
+    try:
+        diagram = BPMNDiagram.objects.get(id=data['diagram_id'])
+
+        doc = {
+            'diagram_id': data['diagram_id'],
+            'group_id': data['group_id'],
+            'name': data['name'],
+            'description': data['description'],
+            'workflow_type': data['workflow_type'],
+            'members': data['members'],
+            'actor': data['actor'],
+            'endpoints': data['endpoints']
+        }
+
+        result = cpps_collection.update_one(
+            {'group_id': data['group_id']},
+            {'$set': doc},
+            upsert=True
+        )
+
+        return Response({'status': 'ok', 'created': result.upserted_id is not None})
+    except BPMNDiagram.DoesNotExist:
+        return Response({'error': 'Diagram not found'}, status=404)
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
