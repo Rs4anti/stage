@@ -83,10 +83,13 @@ def save_composite_service(request):
         return Response({'error': 'Invalid group_type: must be CPPS or CPPN'}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
+        # 🔍 Verifica che il diagramma esista
         diagram = BPMNDiagram.objects.get(id=data['diagram_id'])
 
+        # 🗂️ Scegli la collezione Mongo corretta
         collection = cpps_collection if group_type == 'CPPS' else cppn_collection
 
+        # 📄 Documento base
         doc = {
             'diagram_id': data['diagram_id'],
             'group_id': data['group_id'],
@@ -99,9 +102,13 @@ def save_composite_service(request):
         if group_type == 'CPPN':
             doc['actors'] = data.get('actors', [])
             doc['gdpr_map'] = data.get('gdpr_map', {})
+
         elif group_type == 'CPPS':
             doc['actor'] = data.get('actor', '')
+            doc['properties'] = data.get('properties', '')
+            doc['endpoints'] = data.get('endpoints', [])  # ✅ Aggiunto salvataggio endpoint
 
+        # 💾 Inserisce o aggiorna il documento
         result = collection.update_one(
             {'group_id': data['group_id']},
             {'$set': doc},
@@ -118,3 +125,4 @@ def save_composite_service(request):
     except Exception as e:
         print("!!! Errore API save_composite_service:", e)
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
