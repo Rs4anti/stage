@@ -71,7 +71,7 @@ def save_composite_service(request):
     data = request.data
     print("=== Payload received (composite):", data)
 
-    required_fields = ['diagram_id', 'group_id', 'group_type', 'name', 'description', 'workflow_type']#, 'members']
+    required_fields = ['diagram_id', 'group_id', 'group_type', 'name', 'description', 'workflow_type', 'members']
 
     missing = [f for f in required_fields if f not in data]
 
@@ -84,27 +84,27 @@ def save_composite_service(request):
         return Response({'error': 'Invalid group_type: must be CPPS or CPPN'}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        # ✅ verifica che il diagramma esista
+        #  verifica che il diagramma esista
         diagram = BPMNDiagram.objects.get(id=data['diagram_id'])
 
-        # 🔍 scegli la collezione Mongo corretta
+        # scegli la collezione Mongo corretta
         collection = cpps_collection if group_type == 'CPPS' else cppn_collection
 
-        # 🔄 prepara il documento da salvare
+        # prepara il documento da salvare
         doc = {
             'diagram_id': data['diagram_id'],
             'group_id': data['group_id'],
             'name': data['name'],
             'description': data['description'],
             'workflow_type': data['workflow_type'],
-            #'members': data['members'],
+            'members': data['members'],
         }
 
         if group_type == 'CPPN':
             doc['actors'] = data.get('actors', [])
             doc['gdpr_map'] = data.get('gdpr_map', {})
 
-        # 🧾 salva o aggiorna
+        # salva o aggiorna
         result = collection.update_one(
             {'group_id': data['group_id']},
             {'$set': doc},

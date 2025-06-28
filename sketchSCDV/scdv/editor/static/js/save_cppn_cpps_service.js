@@ -16,7 +16,8 @@ async function saveCompositeService() {
     const actors = document.getElementById('actorsInvolved').value.trim();
     const gdprMap = document.getElementById('gdprMap').value.trim();
 
-    //const members = detectGroupMembers(currentElement);
+    const members = detectGroupMembers(currentElement);
+    console.log("Group member's:", members);
 
     //TODO: validazione ampliambile
     if (!name) {
@@ -55,7 +56,7 @@ async function saveCompositeService() {
         name,
         description,
         workflowType,
-        //members: members.join(','),
+        members: members.join(','),
         actors: groupType === 'CPPN' ? actors : '',
         gdprMap: groupType === 'CPPN' ? gdprMap : ''
     });
@@ -69,7 +70,7 @@ async function saveCompositeService() {
         extensionElements
     });
 
-    // 📨 Invia al backend
+    // Invia al backend
     try {
         const response = await fetch('/editor/api/save-composite-service/', {
             method: 'POST',
@@ -84,7 +85,7 @@ async function saveCompositeService() {
                 name,
                 description,
                 workflow_type: workflowType,
-                //members,
+                members,
                 actors: actors.split(',').map(s => s.trim()),
                 gdpr_map: gdprMap ? JSON.parse(gdprMap) : {}
             })
@@ -114,18 +115,22 @@ function toggleCPPNFields() {
   cppnFields.style.display = type === 'CPPN' ? 'block' : 'none';
 }
 
-/*
+
 // TODO: verifica funzionamento! rilevazione automatica se cppn o cpps
 function detectGroupActors(groupElement) {
+  console.log('detectGroupActors called');
   const elementRegistry = bpmnModeler.get('elementRegistry');
-  const graphicsFactory = bpmnModeler.get('graphicsFactory');
-  const groupShape = graphicsFactory.getShape(groupElement.id);
-  const groupBBox = groupShape.getBBox();
+  const canvas = bpmnModeler.get('canvas');
 
+  // Ottieni bounding box assoluto del gruppo
+  const groupBBox = canvas.getAbsoluteBBox(groupElement);
+
+  // Filtra tutte le lane (attori)
   const lanes = elementRegistry.filter(el => el.type === 'bpmn:Lane');
 
+  // Trova le lane che intersecano il gruppo
   const intersectingLanes = lanes.filter(lane => {
-    const laneBBox = graphicsFactory.getShape(lane.id).getBBox();
+    const laneBBox = canvas.getAbsoluteBBox(lane);
     return doBoundingBoxesIntersect(groupBBox, laneBBox);
   });
 
@@ -145,22 +150,23 @@ function doBoundingBoxesIntersect(a, b) {
 
 //TODO: verificare funzionamento 
 function detectGroupMembers(groupElement) {
+  console.log('detectGroupMembers called');
+
   const elementRegistry = bpmnModeler.get('elementRegistry');
-  const graphicsFactory = bpmnModeler.get('graphicsFactory');
-  const groupBBox = graphicsFactory.getShape(groupElement.id).getBBox();
+  const canvas = bpmnModeler.get('canvas');
+
+  const groupBBox = canvas.getAbsoluteBBox(groupElement);
 
   const taskLike = elementRegistry.filter(el =>
-    el.type.startsWith('bpmn:') && (
-      el.type === 'bpmn:Task' ||
-      el.type === 'bpmn:SubProcess' ||
-      el.type === 'bpmn:CallActivity'
-    )
+    el.type === 'bpmn:Task' ||
+    el.type === 'bpmn:SubProcess' ||
+    el.type === 'bpmn:CallActivity'
   );
 
   return taskLike
     .filter(el => {
-      const shape = graphicsFactory.getShape(el.id);
-      return doBoundingBoxesIntersect(groupBBox, shape.getBBox());
+      const elBBox = canvas.getAbsoluteBBox(el);
+      return doBoundingBoxesIntersect(groupBBox, elBBox);
     })
     .map(el => el.id);
 }
@@ -173,5 +179,3 @@ function doBoundingBoxesIntersect(a, b) {
     a.y + a.height > b.y
   );
 }
-
-*/
