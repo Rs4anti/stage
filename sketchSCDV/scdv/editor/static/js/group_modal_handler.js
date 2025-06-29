@@ -4,7 +4,10 @@ function openGroupClassificationForm(element) {
   currentElement = element;
   const bo = element.businessObject;
 
-  let groupType = '';
+  // Determina automaticamente CPPS o CPPN in base al numero di participant
+  const detectedParticipants = detectGroupParticipants(element);
+  let groupType = detectedParticipants.length === 1 ? 'CPPS' : 'CPPN';
+
   let name = '';
   let description = '';
   let workflowType = '';
@@ -30,7 +33,7 @@ function openGroupClassificationForm(element) {
 
   // Se è un nuovo gruppo senza estensioni salvate
   if (!bo.extensionElements?.values?.length) {
-    const detectedParticipants = detectGroupParticipants(element);
+    //const detectedParticipants = detectGroupParticipants(element);
 
     // CPPN: imposta attori e mappa GDPR
     if ((groupType || 'CPPS') === 'CPPN') {
