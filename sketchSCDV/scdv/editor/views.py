@@ -6,10 +6,25 @@ from .models import BPMNDiagram, AtomicService
 from django.views.decorators.csrf import csrf_exempt
 from mongodb_handler import atomic_services_collection, cpps_collection, cppn_collection, bpmn_collection
 from django.utils.timezone import now
+from drf_spectacular.utils import extend_schema_view, extend_schema, OpenApiResponse
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from django.http import JsonResponse
 
 
 def data_view_editor(request):
     return render(request, 'editor/view.html')
+
+
+def atomic_docs_page(request):
+    services = list(atomic_services_collection.find())
+    base_url = request.build_absolute_uri('/').rstrip('/')
+
+    # Costruisci struttura dati da passare al template
+    for s in services:
+        s['schema_url'] = f"{base_url}/editor/schema/atomic/{s['task_id']}/"
+
+    return render(request, 'editor/atomic_docs.html', {'services': services})
 
 @api_view(['POST'])
 def save_diagram(request):
@@ -146,3 +161,116 @@ def save_cpps_service(request):
         return Response({'error': 'Diagram not found'}, status=404)
     except Exception as e:
         return Response({'error': str(e)}, status=500)
+    
+
+class AtomicServiceSchemaView(APIView):
+    """
+    Dynamic OpenAPI 3.1 schema for atomic services stored in MongoDB.
+    """
+
+    def get(self, request):
+        paths = {}
+        for doc in atomic_services_collection.find():
+            path = doc.get("url")
+            method = doc.get("method", "POST").lower()
+            input_params = doc.get("input_params", [])
+            output_params = doc.get("output_params", [])
+
+            paths.setdefault(path, {})[method] = {
+                "operationId": doc.get("name", "unnamed-service"),
+                "summary": f"{doc.get('atomic_type')} atomic service",
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {p: {"type": "string"} for p in input_params},
+                                "required": input_params
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {p: {"type": "string"} for p in output_params}
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": ["atomic"],
+                "x-atomic-type": doc.get("atomic_type")
+            }
+
+        openapi = {
+            "openapi": "3.1.0",
+            "info": {
+                "title": "Atomic Services API",
+                "version": "1.0.0"
+            },
+            "paths": paths
+        }
+        return Response(openapi)
+    
+
+
+@api_view(['GET'])
+def atomic_service_schema(request, task_id):
+    atomic = atomic_services_collection.find_one({'task_id': task_id})
+    if not atomic:
+        return JsonResponse({'error': 'Atomic service not found'}, status=404)
+
+    schema = {
+        'openapi': '3.1.0',
+        'info': {
+            'title': f"Atomic Service: {atomic.get('name', task_id)}",
+            'version': '1.0.0',
+        },
+        'paths': {
+            atomic['url']: {
+                atomic.get('method', 'POST').lower(): {
+                'operationId': atomic.get('name', task_id),
+                    'summary': f"{atomic.get('atomic_type', 'atomic')} service",
+                    'requestBody': {
+                        'required': True,
+                            'content': {
+                                'application/json': {
+                                    'schema': {
+                                        'type': 'object',
+                                        'properties': {
+                                            k: {'type': 'string'} for k in atomic.get('input_params', [])
+                                        },
+                                        'required': atomic.get('input_params', [])
+                                    }
+                                }
+                            }
+                        },
+                        'responses': {
+                            '200': {
+                                'description': 'Success',
+                                'content': {
+                                    'application/json': {
+                                        'schema': {
+                                            'type': 'object',
+                                            'properties': {
+                                                k: {'type': 'string'} for k in atomic.get('output_params', [])
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        'tags': ['atomic'],
+                        'x-atomic-type': atomic.get('atomic_type', '')
+                    }
+                }
+            }
+        }
+
+    return JsonResponse(schema)
