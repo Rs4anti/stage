@@ -4,7 +4,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from .models import BPMNDiagram, AtomicService
 from django.views.decorators.csrf import csrf_exempt
-from mongodb_handler import atomic_services_collection, cpps_collection, cppn_collection
+from mongodb_handler import atomic_services_collection, cpps_collection, cppn_collection, bpmn_collection
+from django.utils.timezone import now
 
 
 def data_view_editor(request):
@@ -13,11 +14,14 @@ def data_view_editor(request):
 @api_view(['POST'])
 def save_diagram(request):
     data = request.data
-    diagram = BPMNDiagram.objects.create(
-        name=data['name'],
-        xml_content=data['xml_content']
-    )
-    return Response({'id': diagram.id, 'status': 'saved'})
+    diagram = {
+        "name": data['name'],
+        "xml_content": data['xml_content'],
+        "created_at": now()
+    }
+    result = bpmn_collection.insert_one(diagram)
+    return Response({'id': str(result.inserted_id), 'status': 'saved'})
+
 
 
 @api_view(['POST'])

@@ -45,7 +45,7 @@ async function openDiagram(xml) {
 }
 
 
-async function exportDiagram() {
+async function saveDiagram() {
   try {
     const { xml } = await bpmnModeler.saveXML({ format: true });
     console.log(xml);
@@ -104,7 +104,7 @@ function resetDiagram() {
   openDiagram(emptyDiagram);
 }
 
-$('#save-button').click(exportDiagram);
+$('#save-button').click(saveDiagram);
 
 resetDiagram();
 

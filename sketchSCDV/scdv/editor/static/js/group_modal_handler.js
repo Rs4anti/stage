@@ -33,7 +33,6 @@ function openGroupClassificationForm(element) {
 
   // Se è un nuovo gruppo senza estensioni salvate
   if (!bo.extensionElements?.values?.length) {
-    //const detectedParticipants = detectGroupParticipants(element);
 
     // CPPN: imposta attori e mappa GDPR
     if ((groupType || 'CPPS') === 'CPPN') {
@@ -66,14 +65,14 @@ function openGroupClassificationForm(element) {
 
   // Popola GDPR Mapping (attori già noti, ruoli da inserire)
   // Popola GDPR Mapping usando actorsInvolved
-const gdprNote = document.getElementById('gdprNote');
-populateGdprMappingFromActorsInvolved();
+  const gdprNote = document.getElementById('gdprNote');
+  populateGdprMappingFromActorsInvolved();
 
-if ((groupType || 'CPPS') === 'CPPN' && gdprNote) {
-  gdprNote.style.display = 'inline';
-} else if (gdprNote) {
-  gdprNote.style.display = 'none';
-}
+  if ((groupType || 'CPPS') === 'CPPN' && gdprNote) {
+    gdprNote.style.display = 'inline';
+  } else if (gdprNote) {
+    gdprNote.style.display = 'none';
+  }
 
 
   // Popola endpoint CPPS
