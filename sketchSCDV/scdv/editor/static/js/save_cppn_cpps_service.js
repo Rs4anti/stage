@@ -12,8 +12,20 @@ async function saveCompositeService() {
   const workflowType = document.getElementById('workflowTypeSelect').value;
   const actor = document.getElementById('singleActor')?.value.trim() || '';
   const actors = document.getElementById('actorsInvolved')?.value.trim() || '';
-  const gdprMap = document.getElementById('gdprMap')?.value.trim() || '';
 
+  // ⬇️ GDPR Mapping dinamico
+  const gdprMap = {};
+  const gdprMapContainer = document.getElementById('gdprMapContainer');
+  [...gdprMapContainer.children].forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    const actorName = inputs[0]?.value.trim();
+    const role = inputs[1]?.value.trim();
+    if (actorName && role) {
+      gdprMap[actorName] = role;
+    }
+  });
+
+  // ⬇️ Endpoint dinamici (solo CPPS)
   const endpointRows = document.querySelectorAll('#endpointsContainer > div');
   const endpoints = Array.from(endpointRows).map(row => {
     const method = row.querySelector('select')?.value || '';
@@ -51,6 +63,7 @@ async function saveCompositeService() {
     window.diagramId = result.id;
   }
 
+  // ⬇️ Prepara payload
   const payload = {
     diagram_id: window.diagramId,
     group_id: currentElement.id,
@@ -66,7 +79,7 @@ async function saveCompositeService() {
     if (groupType === 'CPPN') {
       payload.group_type = 'CPPN';
       payload.actors = actors.split(',').map(s => s.trim());
-      payload.gdpr_map = gdprMap ? JSON.parse(gdprMap) : {};
+      payload.gdpr_map = gdprMap;
       result = await saveCPPNService(payload);
     } else {
       payload.group_type = 'CPPS';
@@ -83,7 +96,6 @@ async function saveCompositeService() {
 
   bootstrap.Modal.getInstance(document.getElementById('groupTypeModal')).hide();
 }
-
 
 async function saveCPPNService(payload) {
   const csrftoken = getCookie('csrftoken');
@@ -119,7 +131,6 @@ async function saveCPPSService(payload) {
   return result;
 }
 
-
 function detectGroupMembers(groupElement) {
   const elementRegistry = bpmnModeler.get('elementRegistry');
   const canvas = bpmnModeler.get('canvas');
@@ -131,7 +142,7 @@ function detectGroupMembers(groupElement) {
     el.type === 'bpmn:CallActivity'
   );
 
-  const members = taskLike
+  return taskLike
     .filter(el => {
       const elBBox = canvas.getAbsoluteBBox(el);
       return (
@@ -142,7 +153,4 @@ function detectGroupMembers(groupElement) {
       );
     })
     .map(el => el.id);
-
-  return Array.isArray(members) ? members : [];
 }
-

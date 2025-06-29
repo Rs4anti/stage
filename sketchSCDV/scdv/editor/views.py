@@ -135,8 +135,14 @@ def save_cppn_service(request):
     if missing:
         return Response({'error': f'Missing fields: {", ".join(missing)}'}, status=400)
 
+    if not isinstance(data['actors'], list):
+        return Response({'error': 'Field "actors" must be a list'}, status=400)
+
+    if not isinstance(data['gdpr_map'], dict):
+        return Response({'error': 'Field "gdpr_map" must be a JSON object'}, status=400)
+
     try:
-        diagram = BPMNDiagram.objects.get(id=data['diagram_id'])
+        BPMNDiagram.objects.get(id=data['diagram_id'])
 
         doc = {
             'diagram_id': data['diagram_id'],
@@ -156,6 +162,7 @@ def save_cppn_service(request):
         )
 
         return Response({'status': 'ok', 'created': result.upserted_id is not None})
+
     except BPMNDiagram.DoesNotExist:
         return Response({'error': 'Diagram not found'}, status=404)
     except Exception as e:

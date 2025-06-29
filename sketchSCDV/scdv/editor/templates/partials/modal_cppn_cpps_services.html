@@ -50,8 +50,9 @@
           </div>
 
           <div class="mb-3">
-            <label for="gdprMap" class="form-label">GDPR Mapping (JSON)</label>
-            <textarea class="form-control" id="gdprMap" rows="2" placeholder='{"Actor1": "Controller", "Actor2": "Processor"}'></textarea>
+            <label class="form-label">GDPR Mapping (Actor → Role)</label>
+            <div id="gdprMapContainer"></div>
+            <button type="button" class="btn btn-sm btn-outline-secondary mt-2" onclick="addGdprRow()">+ Add Mapping</button>
           </div>
         </div>
 
@@ -66,7 +67,8 @@
           <input type="text" class="form-control" id="groupName" />
         </div>
 
-        <div class="mb-3">
+        <!-- Endpoint section, visible only for CPPS -->
+        <div class="mb-3" id="cppsEndpoints">
           <label class="form-label">Endpoints (method + URL)</label>
           <div id="endpointsContainer"></div>
           <button type="button" class="btn btn-secondary btn-sm mt-2" onclick="addEndpointRow()">+ Add Endpoint</button>

@@ -10,10 +10,10 @@ function openGroupClassificationForm(element) {
   let workflowType = '';
   let singleActor = '';
   let actors = '';
-  let gdprMap = '';
-  let properties = '';
+  let gdprMap = {}; // ora oggetto
   let endpoints = [];
 
+  // Estrai eventuale estensione esistente
   if (bo.extensionElements?.values?.length) {
     const ext = bo.extensionElements.values.find(e => e.$type === 'custom:GroupExtension');
     if (ext) {
@@ -23,33 +23,42 @@ function openGroupClassificationForm(element) {
       workflowType = ext.workflowType || '';
       singleActor = ext.actor || '';
       actors = ext.actors || '';
-      gdprMap = ext.gdprMap || '';
-      properties = ext.properties || '';
+      gdprMap = ext.gdprMap || {};
       endpoints = ext.endpoints || [];
     }
   }
 
-  // Compila i campi nel form
+  // Popola i campi principali
   document.getElementById('groupTypeSelect').value = groupType || 'CPPS';
+
+   // Mostra/Nasconde campi specifici in base al tipo selezionato
+  toggleCPPNFields();
+
   document.getElementById('workflowTypeSelect').value = workflowType || 'sequence';
   document.getElementById('groupDescription').value = description || '';
   document.getElementById('groupName').value = name || '';
   document.getElementById('singleActor').value = singleActor || detectGroupActors(element)[0] || '';
   document.getElementById('actorsInvolved').value = actors || detectGroupActors(element).join(', ');
-  document.getElementById('gdprMap').value = gdprMap || '';
 
-  toggleCPPNFields();
+ 
 
-  // Inizializza gli endpoint
-  const container = document.getElementById('endpointsContainer');
-  container.innerHTML = '';
+  // 🧩 Popola i campi GDPR dinamici
+  const gdprContainer = document.getElementById('gdprMapContainer');
+  gdprContainer.innerHTML = '';
+  if (gdprMap && typeof gdprMap === 'object') {
+    Object.entries(gdprMap).forEach(([actor, role]) => addGdprRow(actor, role));
+  }
+
+  // Popola gli endpoint
+  const epContainer = document.getElementById('endpointsContainer');
+  epContainer.innerHTML = '';
   endpoints.forEach(ep => addEndpointRow(ep.method, ep.url));
 
+  // Mostra la modale
   const modal = new bootstrap.Modal(document.getElementById('groupTypeModal'));
   modal.show();
 }
 
-// Funzione per aggiungere una riga di endpoint dinamicamente
 function addEndpointRow(method = '', url = '') {
   const container = document.getElementById('endpointsContainer');
   const div = document.createElement('div');
@@ -69,19 +78,42 @@ function addEndpointRow(method = '', url = '') {
   container.appendChild(div);
 }
 
-// Mostra/nasconde campi specifici a CPPS o CPPN
+function addGdprRow(actor = '', role = '') {
+  const container = document.getElementById('gdprMapContainer');
+  const div = document.createElement('div');
+  div.classList.add('d-flex', 'mb-2', 'gap-2');
+
+  div.innerHTML = `
+    <input type="text" class="form-control form-control-sm" placeholder="Actor" value="${actor}">
+    <input type="text" class="form-control form-control-sm" placeholder="Role (e.g., Controller)" value="${role}">
+    <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.parentElement.remove()">×</button>
+  `;
+
+  container.appendChild(div);
+}
+
 function toggleCPPNFields() {
   const type = document.getElementById('groupTypeSelect').value;
+
   const cppnFields = document.getElementById('cppnFields');
   const cppsActorField = document.getElementById('cppsActorField');
+  const cppsEndpoints = document.getElementById('cppsEndpoints'); // aggiunto
 
-  if (cppnFields && cppsActorField) {
-    cppnFields.style.display = type === 'CPPN' ? 'block' : 'none';
-    cppsActorField.style.display = type === 'CPPS' ? 'block' : 'none';
+  if (cppnFields && cppsActorField && cppsEndpoints) {
+    if (type === 'CPPN') {
+      cppnFields.style.display = 'block';
+      cppsActorField.style.display = 'none';
+      cppsEndpoints.style.display = 'none'; // nasconde se non CPPS
+    } else {
+      cppnFields.style.display = 'none';
+      cppsActorField.style.display = 'block';
+      cppsEndpoints.style.display = 'block'; // mostra se CPPS
+    }
   }
 }
 
-// Esempio semplice di rilevamento attori (lane)
+
+
 function detectGroupActors(groupElement) {
   const elementRegistry = bpmnModeler.get('elementRegistry');
   const canvas = bpmnModeler.get('canvas');
