@@ -20,11 +20,15 @@ def atomic_docs_page(request):
     services = list(atomic_services_collection.find())
     base_url = request.build_absolute_uri('/').rstrip('/')
 
-    # Costruisci struttura dati da passare al template
     for s in services:
         s['schema_url'] = f"{base_url}/editor/schema/atomic/{s['task_id']}/"
 
     return render(request, 'editor/atomic_docs.html', {'services': services})
+
+def swagger_viewer(request, task_id):
+    base_url = request.build_absolute_uri('/').rstrip('/')
+    schema_url = f"{base_url}/editor/schema/atomic/{task_id}/"
+    return render(request, 'editor/swagger_viewer.html', {'schema_url': schema_url})
 
 @api_view(['POST'])
 def save_diagram(request):

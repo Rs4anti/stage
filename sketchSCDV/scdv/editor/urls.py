@@ -10,4 +10,5 @@ urlpatterns = [
     path('schema/atomic/', views.AtomicServiceSchemaView.as_view(), name='atomic-schema'),
     path('schema/atomic/<str:task_id>/', views.atomic_service_schema, name='atomic-schema-by-id'),
     path('docs/atomic/', views.atomic_docs_page, name='atomic-docs-page'),
+    path('docs/atomic/view/<str:task_id>/', views.swagger_viewer, name='swagger-viewer'),
 ]

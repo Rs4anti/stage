@@ -26,7 +26,11 @@
           <td>{{ service.name }}</td>
           <td>{{ service.method }}</td>
           <td>{{ service.url }}</td>
-          <td><a href="{{ service.schema_url }}" target="_blank" class="btn btn-sm btn-primary">OpenAPI</a></td>
+          <td>
+            <a href="{{ service.schema_url }}" target="_blank" class="btn btn-sm btn-secondary">JSON</a>
+            <a href="{% url 'swagger-viewer' task_id=service.task_id %}" target="_blank" class="btn btn-sm btn-primary">Swagger UI</a>
+            </td>
+
         </tr>
       {% endfor %}
     </tbody>
