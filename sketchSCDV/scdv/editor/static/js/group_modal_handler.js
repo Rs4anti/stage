@@ -32,56 +32,57 @@ function openGroupClassificationForm(element) {
   if (!bo.extensionElements?.values?.length) {
     const detectedParticipants = detectGroupParticipants(element);
 
-    // Autocompletamento per CPPN
+    // CPPN: imposta attori e mappa GDPR
     if ((groupType || 'CPPS') === 'CPPN') {
       if (detectedParticipants.length > 0) {
         actors = detectedParticipants.join(', ');
         gdprMap = {};
         detectedParticipants.forEach(actor => {
-        gdprMap[actor] = actor.toLowerCase().includes('supplier') ? 'Data Processor' : 'Data Controller';
-      });
-}
-
+          gdprMap[actor] = ''; // ruoli da compilare
+        });
+      }
       workflowType = 'sequence';
     }
 
-    // Autocompletamento per CPPS
+    // CPPS: imposta attore singolo se unico rilevato
     if ((groupType || 'CPPS') === 'CPPS' && detectedParticipants.length === 1) {
-        singleActor = detectedParticipants[0];
+      singleActor = detectedParticipants[0];
+    }
   }
 
-  }
-
-  // Popola i campi principali
+  // Popola i campi base
   document.getElementById('groupTypeSelect').value = groupType || 'CPPS';
   toggleCPPNFields();
-
   document.getElementById('workflowTypeSelect').value = workflowType || 'sequence';
   document.getElementById('groupDescription').value = description || '';
   document.getElementById('groupName').value = name || '';
   document.getElementById('singleActor').value = singleActor || '';
   document.getElementById('actorsInvolved').value = actors || detectGroupParticipants(element).join(', ');
-
-  // Disabilita la modifica dei campi attore
   document.getElementById('singleActor').readOnly = true;
   document.getElementById('actorsInvolved').readOnly = true;
 
-  // Popola i campi GDPR dinamici
-  const gdprContainer = document.getElementById('gdprMapContainer');
-  gdprContainer.innerHTML = '';
-  if (gdprMap && typeof gdprMap === 'object') {
-    Object.entries(gdprMap).forEach(([actor, role]) => addGdprRow(actor, role));
-  }
+  // Popola GDPR Mapping (attori già noti, ruoli da inserire)
+  // Popola GDPR Mapping usando actorsInvolved
+const gdprNote = document.getElementById('gdprNote');
+populateGdprMappingFromActorsInvolved();
 
-  // Popola gli endpoint
+if ((groupType || 'CPPS') === 'CPPN' && gdprNote) {
+  gdprNote.style.display = 'inline';
+} else if (gdprNote) {
+  gdprNote.style.display = 'none';
+}
+
+
+  // Popola endpoint CPPS
   const epContainer = document.getElementById('endpointsContainer');
   epContainer.innerHTML = '';
   endpoints.forEach(ep => addEndpointRow(ep.method, ep.url));
 
-  // Mostra la modale
+  // Mostra modale
   const modal = new bootstrap.Modal(document.getElementById('groupTypeModal'));
   modal.show();
 }
+
 
 
 function addEndpointRow(method = '', url = '') {
@@ -105,17 +106,19 @@ function addEndpointRow(method = '', url = '') {
 
 function addGdprRow(actor = '', role = '') {
   const container = document.getElementById('gdprMapContainer');
-  const div = document.createElement('div');
-  div.classList.add('d-flex', 'mb-2', 'gap-2');
+  const row = document.createElement('div');
+  row.classList.add('d-flex', 'mb-2', 'gap-2');
 
-  div.innerHTML = `
-    <input type="text" class="form-control form-control-sm" placeholder="Actor" value="${actor}">
+  row.innerHTML = `
+    <input type="text" class="form-control form-control-sm bg-light text-muted" value="${actor}" readonly>
     <input type="text" class="form-control form-control-sm" placeholder="Role (e.g., Controller)" value="${role}">
-    <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.parentElement.remove()">×</button>
   `;
 
-  container.appendChild(div);
+  container.appendChild(row);
 }
+
+
+
 
 function toggleCPPNFields() {
   const type = document.getElementById('groupTypeSelect').value;
@@ -162,4 +165,15 @@ function detectGroupParticipants(groupElement) {
 
 function getParticipantName(element) {
   return element.businessObject.name || '(nessun nome)';
+}
+
+
+function populateGdprMappingFromActorsInvolved() {
+  const gdprContainer = document.getElementById('gdprMapContainer');
+  gdprContainer.innerHTML = '';
+
+  const raw = document.getElementById('actorsInvolved').value;
+  const actors = raw.split(',').map(a => a.trim()).filter(a => a.length > 0);
+
+  actors.forEach(actor => addGdprRow(actor, ''));
 }
