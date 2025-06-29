@@ -93,6 +93,11 @@ bpmnModeler.get('eventBus').on('element.click', function (e) {
     openGroupClassificationForm(el);
   }
 
+   if (el && el.type === 'bpmn:Participant') {
+    console.log('chiamo logLaneName');
+    logParticipantName(el);
+  }
+
 });
 
 function resetDiagram() {
@@ -102,3 +107,10 @@ function resetDiagram() {
 $('#save-button').click(exportDiagram);
 
 resetDiagram();
+
+function logParticipantName(element) {
+  const name = element.businessObject.name || '(nessun nome)';
+  console.log('Nome attore (participant/pool):', name);
+}
+
+

@@ -10,7 +10,7 @@ function openGroupClassificationForm(element) {
   let workflowType = '';
   let singleActor = '';
   let actors = '';
-  let gdprMap = {}; // ora oggetto
+  let gdprMap = {};
   let endpoints = [];
 
   // Estrai eventuale estensione esistente
@@ -28,21 +28,45 @@ function openGroupClassificationForm(element) {
     }
   }
 
+  // Se è un nuovo gruppo senza estensioni salvate
+  if (!bo.extensionElements?.values?.length) {
+    const detectedParticipants = detectGroupParticipants(element);
+
+    // Autocompletamento per CPPN
+    if ((groupType || 'CPPS') === 'CPPN') {
+      if (detectedParticipants.length > 0) {
+        actors = detectedParticipants.join(', ');
+        gdprMap = {};
+        detectedParticipants.forEach(actor => {
+        gdprMap[actor] = actor.toLowerCase().includes('supplier') ? 'Data Processor' : 'Data Controller';
+      });
+}
+
+      workflowType = 'sequence';
+    }
+
+    // Autocompletamento per CPPS
+    if ((groupType || 'CPPS') === 'CPPS' && detectedParticipants.length === 1) {
+        singleActor = detectedParticipants[0];
+  }
+
+  }
+
   // Popola i campi principali
   document.getElementById('groupTypeSelect').value = groupType || 'CPPS';
-
-   // Mostra/Nasconde campi specifici in base al tipo selezionato
   toggleCPPNFields();
 
   document.getElementById('workflowTypeSelect').value = workflowType || 'sequence';
   document.getElementById('groupDescription').value = description || '';
   document.getElementById('groupName').value = name || '';
-  document.getElementById('singleActor').value = singleActor || detectGroupActors(element)[0] || '';
-  document.getElementById('actorsInvolved').value = actors || detectGroupActors(element).join(', ');
+  document.getElementById('singleActor').value = singleActor || '';
+  document.getElementById('actorsInvolved').value = actors || detectGroupParticipants(element).join(', ');
 
- 
+  // Disabilita la modifica dei campi attore
+  document.getElementById('singleActor').readOnly = true;
+  document.getElementById('actorsInvolved').readOnly = true;
 
-  // 🧩 Popola i campi GDPR dinamici
+  // Popola i campi GDPR dinamici
   const gdprContainer = document.getElementById('gdprMapContainer');
   gdprContainer.innerHTML = '';
   if (gdprMap && typeof gdprMap === 'object') {
@@ -58,6 +82,7 @@ function openGroupClassificationForm(element) {
   const modal = new bootstrap.Modal(document.getElementById('groupTypeModal'));
   modal.show();
 }
+
 
 function addEndpointRow(method = '', url = '') {
   const container = document.getElementById('endpointsContainer');
@@ -114,22 +139,27 @@ function toggleCPPNFields() {
 
 
 
-function detectGroupActors(groupElement) {
+function detectGroupParticipants(groupElement) {
   const elementRegistry = bpmnModeler.get('elementRegistry');
   const canvas = bpmnModeler.get('canvas');
   const groupBBox = canvas.getAbsoluteBBox(groupElement);
 
-  const lanes = elementRegistry.filter(el => el.type === 'bpmn:Lane');
+  const participants = elementRegistry.filter(el => el.type === 'bpmn:Participant');
 
-  const intersecting = lanes.filter(lane => {
-    const laneBBox = canvas.getAbsoluteBBox(lane);
+  const intersecting = participants.filter(part => {
+    const partBBox = canvas.getAbsoluteBBox(part);
     return (
-      groupBBox.x < laneBBox.x + laneBBox.width &&
-      groupBBox.x + groupBBox.width > laneBBox.x &&
-      groupBBox.y < laneBBox.y + laneBBox.height &&
-      groupBBox.y + groupBBox.height > laneBBox.y
+      groupBBox.x < partBBox.x + partBBox.width &&
+      groupBBox.x + groupBBox.width > partBBox.x &&
+      groupBBox.y < partBBox.y + partBBox.height &&
+      groupBBox.y + groupBBox.height > partBBox.y
     );
   });
 
-  return intersecting.map(lane => lane.businessObject.name);
+  return intersecting.map(getParticipantName);
+}
+
+
+function getParticipantName(element) {
+  return element.businessObject.name || '(nessun nome)';
 }
