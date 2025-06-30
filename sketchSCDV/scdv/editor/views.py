@@ -301,8 +301,9 @@ def atomic_service_schema(request, task_id):
 def get_cppn_service(request, group_id):
     service = cppn_collection.find_one({'group_id': group_id})
     if not service:
-        return Response({'error': 'CPPN not found'}, status=404)
-    return Response(service)
+        return JsonResponse({'error': 'CPPN not found'}, status=404)
+
+    return JsonResponse(service, safe=False, json_dumps_params={'default': json_util.default})
 
 @api_view(['GET'])
 def get_cpps_service(request, group_id):

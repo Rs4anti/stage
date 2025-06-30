@@ -111,52 +111,53 @@ async function loadDetailsFromMongo(element) {
   const type = element.type;
   const id = bo.id;
 
-  let endpoint = null;
-
   if (type === 'bpmn:Task') {
-    endpoint = `/editor/api/atomic_service/${id}/`;
-  }
-
-  else if (type === 'bpmn:Group') {
-    try {
-      const res = await fetch(`/editor/api/cppn_service/${id}/`);
-      if (res.ok) {
-        const data = await res.json();
-        renderDetails(data, 'CPPN');
-        return openGroupClassificationForm(element, data);  // ✅ passa i dati alla modale
-      }
-    } catch (err) {
-      console.warn("Errore nel recupero CPPN:", err);
-    }
-
-    try {
-      const res = await fetch(`/editor/api/cpps_service/${id}/`);
-      if (res.ok) {
-        const data = await res.json();
-        renderDetails(data, 'CPPS');
-        return openGroupClassificationForm(element, data);  // ✅ passa i dati alla modale
-      }
-    } catch (err) {
-      console.warn("Errore nel recupero CPPS:", err);
-    }
-
-    renderNotFound(id);
-    return;
-  }
-
-  // Atomic service
-  if (endpoint) {
+    const endpoint = `/editor/api/atomic_service/${id}/`;
     try {
       const res = await fetch(endpoint);
-      if (!res.ok) throw new Error("Not found");
+      if (!res.ok) throw new Error("Atomic service not found");
       const data = await res.json();
       renderDetails(data, 'Atomic');
     } catch (err) {
-      console.warn("Errore nel recupero Atomic:", err);
+      console.warn(`Atomic not found for ${id}`);
       renderNotFound(id);
     }
+    return;
+  }
+
+  if (type === 'bpmn:Group') {
+    try {
+      // Prova CPPN per primo
+      const cppnRes = await fetch(`/editor/api/cppn_service/${id}/`);
+      if (cppnRes.ok) {
+        const cppnData = await cppnRes.json();
+        renderDetails(cppnData, 'CPPN');
+        openGroupClassificationForm(element, cppnData);
+        return;
+      }
+    } catch (err) {
+      console.warn(`Errore nel recupero CPPN per ${id}`, err);
+    }
+
+    try {
+      // Poi prova CPPS
+      const cppsRes = await fetch(`/editor/api/cpps_service/${id}/`);
+      if (cppsRes.ok) {
+        const cppsData = await cppsRes.json();
+        renderDetails(cppsData, 'CPPS');
+        openGroupClassificationForm(element, cppsData);
+        return;
+      }
+    } catch (err) {
+      console.warn(`Errore nel recupero CPPS per ${id}`, err);
+    }
+
+    // Nessun servizio trovato
+    renderNotFound(id);
+    return;
   }
 }
+
 
 
 function renderDetails(data, type) {
