@@ -1,13 +1,10 @@
-function openGroupClassificationForm(element) {
+function openGroupClassificationForm(element, existingData = null) {
   if (!element || !element.businessObject) return;
 
   currentElement = element;
   const bo = element.businessObject;
 
-  // Determina automaticamente CPPS o CPPN in base al numero di participant
-  const detectedParticipants = detectGroupParticipants(element);
-  let groupType = detectedParticipants.length === 1 ? 'CPPS' : 'CPPN';
-
+  let groupType = '';
   let name = '';
   let description = '';
   let workflowType = '';
@@ -16,74 +13,105 @@ function openGroupClassificationForm(element) {
   let gdprMap = {};
   let endpoints = [];
 
-  // Estrai eventuale estensione esistente
-  if (bo.extensionElements?.values?.length) {
+  // 🔹 Caso 1: dati da MongoDB (API get_cppn_service o get_cpps_service)
+  if (existingData) {
+    groupType = existingData.group_type || 'CPPS';
+    name = existingData.name || '';
+    description = existingData.description || '';
+    workflowType = existingData.workflow_type || '';
+    singleActor = existingData.actor || '';
+    actors = (existingData.actors || []).join(', ');
+    gdprMap = existingData.gdpr_map || {};
+    endpoints = existingData.endpoints || [];
+  }
+
+  // 🔹 Caso 2: estensioni già salvate nel diagramma
+  else if (bo.extensionElements?.values?.length) {
     const ext = bo.extensionElements.values.find(e => e.$type === 'custom:GroupExtension');
     if (ext) {
-      groupType = ext.groupType || '';
+      groupType = ext.groupType || 'CPPS';
       name = ext.name || '';
       description = ext.description || '';
       workflowType = ext.workflowType || '';
       singleActor = ext.actor || '';
       actors = ext.actors || '';
-      gdprMap = ext.gdprMap || {};
-      endpoints = ext.endpoints || [];
+      try {
+        gdprMap = typeof ext.gdprMap === 'string' ? JSON.parse(ext.gdprMap) : ext.gdprMap || {};
+      } catch {
+        gdprMap = {};
+      }
+      try {
+        endpoints = typeof ext.endpoints === 'string' ? JSON.parse(ext.endpoints) : ext.endpoints || [];
+      } catch {
+        endpoints = [];
+      }
     }
   }
 
-  // Se è un nuovo gruppo senza estensioni salvate
-  if (!bo.extensionElements?.values?.length) {
+  // 🔹 Caso 3: fallback automatico basato su partecipanti
+  if (!existingData && !bo.extensionElements?.values?.length) {
+    const detectedParticipants = detectGroupParticipants(element);
+    groupType = detectedParticipants.length === 1 ? 'CPPS' : 'CPPN';
 
-    // CPPN: imposta attori e mappa GDPR
-    if ((groupType || 'CPPS') === 'CPPN') {
-      if (detectedParticipants.length > 0) {
-        actors = detectedParticipants.join(', ');
-        gdprMap = {};
-        detectedParticipants.forEach(actor => {
-          gdprMap[actor] = ''; // ruoli da compilare
-        });
-      }
+    if (groupType === 'CPPN') {
+      actors = detectedParticipants.join(', ');
+      gdprMap = {};
+      detectedParticipants.forEach(actor => {
+        gdprMap[actor] = '';
+      });
       workflowType = 'sequence';
     }
 
-    // CPPS: imposta attore singolo se unico rilevato
-    if ((groupType || 'CPPS') === 'CPPS' && detectedParticipants.length === 1) {
+    if (groupType === 'CPPS' && detectedParticipants.length === 1) {
       singleActor = detectedParticipants[0];
     }
   }
 
-  // Popola i campi base
-  document.getElementById('groupTypeSelect').value = groupType || 'CPPS';
+  // 🧩 Popola i campi della modale
+  document.getElementById('groupTypeSelect').value = groupType;
   toggleCPPNFields();
   document.getElementById('workflowTypeSelect').value = workflowType || 'sequence';
   document.getElementById('groupDescription').value = description || '';
   document.getElementById('groupName').value = name || '';
   document.getElementById('singleActor').value = singleActor || '';
-  document.getElementById('actorsInvolved').value = actors || detectGroupParticipants(element).join(', ');
+  document.getElementById('actorsInvolved').value = actors || '';
+
   document.getElementById('singleActor').readOnly = true;
   document.getElementById('actorsInvolved').readOnly = true;
 
-  // Popola GDPR Mapping (attori già noti, ruoli da inserire)
-  // Popola GDPR Mapping usando actorsInvolved
-  const gdprNote = document.getElementById('gdprNote');
-  populateGdprMappingFromActorsInvolved();
+  // 🛡️ GDPR Map
+  const gdprContainer = document.getElementById('gdprMapContainer');
+  gdprContainer.innerHTML = '';
+  if (groupType === 'CPPN') {
+    if (gdprMap && typeof gdprMap === 'object') {
+      for (const [actor, role] of Object.entries(gdprMap)) {
+        addGdprRow(actor, role);
+      }
+    } else {
+      populateGdprMappingFromActorsInvolved();
+    }
+  }
 
-  if ((groupType || 'CPPS') === 'CPPN' && gdprNote) {
+  const gdprNote = document.getElementById('gdprNote');
+  if (groupType === 'CPPN' && gdprNote) {
     gdprNote.style.display = 'inline';
   } else if (gdprNote) {
     gdprNote.style.display = 'none';
   }
 
-
-  // Popola endpoint CPPS
+  // 🌐 Endpoints (solo CPPS)
   const epContainer = document.getElementById('endpointsContainer');
   epContainer.innerHTML = '';
-  endpoints.forEach(ep => addEndpointRow(ep.method, ep.url));
+  if (groupType === 'CPPS' && Array.isArray(endpoints)) {
+    endpoints.forEach(ep => addEndpointRow(ep.method, ep.url));
+  }
 
-  // Mostra modale
+  // Mostra la modale
   const modal = new bootstrap.Modal(document.getElementById('groupTypeModal'));
   modal.show();
 }
+
+
 
 
 

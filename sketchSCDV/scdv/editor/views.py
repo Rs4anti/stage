@@ -117,6 +117,7 @@ def save_cppn_service(request):
 
     try:
         doc = {
+            "group_type" : "CPPN",
             'diagram_id': str(diagram_id),
             'group_id': data['group_id'],
             'name': data['name'],
@@ -160,6 +161,7 @@ def save_cpps_service(request):
 
     try:
         doc = {
+            "group_type" : "CPPS",
             'diagram_id': str(diagram_id),
             'group_id': data['group_id'],
             'name': data['name'],
@@ -307,7 +309,12 @@ def get_cpps_service(request, group_id):
     service = cpps_collection.find_one({'group_id': group_id})
     if not service:
         return Response({'error': 'CPPS not found'}, status=404)
-    return Response(service)
+
+    from bson import json_util
+    from django.http import JsonResponse
+
+    return JsonResponse(service, safe=False, json_dumps_params={'default': json_util.default})
+
 
 from bson import json_util
 

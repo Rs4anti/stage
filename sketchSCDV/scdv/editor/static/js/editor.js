@@ -112,29 +112,39 @@ async function loadDetailsFromMongo(element) {
   const id = bo.id;
 
   let endpoint = null;
+
   if (type === 'bpmn:Task') {
     endpoint = `/editor/api/atomic_service/${id}/`;
-  } else if (type === 'bpmn:Group') {
+  }
+
+  else if (type === 'bpmn:Group') {
     try {
       const res = await fetch(`/editor/api/cppn_service/${id}/`);
       if (res.ok) {
         const data = await res.json();
-        return renderDetails(data, 'CPPN');
+        renderDetails(data, 'CPPN');
+        return openGroupClassificationForm(element, data);  // ✅ passa i dati alla modale
       }
-    } catch (_) {}
+    } catch (err) {
+      console.warn("Errore nel recupero CPPN:", err);
+    }
 
     try {
       const res = await fetch(`/editor/api/cpps_service/${id}/`);
       if (res.ok) {
         const data = await res.json();
-        return renderDetails(data, 'CPPS');
+        renderDetails(data, 'CPPS');
+        return openGroupClassificationForm(element, data);  // ✅ passa i dati alla modale
       }
-    } catch (_) {}
+    } catch (err) {
+      console.warn("Errore nel recupero CPPS:", err);
+    }
 
     renderNotFound(id);
     return;
   }
 
+  // Atomic service
   if (endpoint) {
     try {
       const res = await fetch(endpoint);
@@ -142,10 +152,12 @@ async function loadDetailsFromMongo(element) {
       const data = await res.json();
       renderDetails(data, 'Atomic');
     } catch (err) {
+      console.warn("Errore nel recupero Atomic:", err);
       renderNotFound(id);
     }
   }
 }
+
 
 function renderDetails(data, type) {
   const section = document.querySelector('.details-section');
