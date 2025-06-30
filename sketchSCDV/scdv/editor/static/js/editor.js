@@ -149,32 +149,161 @@ async function loadDetailsFromMongo(element) {
 
 function renderDetails(data, type) {
   const section = document.querySelector('.details-section');
-  section.innerHTML = `<h6>Type: ${type}</h6><ul id="input-list"></ul><h6>Output</h6><ul id="output-list"></ul>`;
+  section.innerHTML = ''; // reset
 
-  if (data.input_params) {
-    data.input_params.forEach(i => {
-      const li = document.createElement('li');
-      li.textContent = i;
-      document.getElementById('input-list').appendChild(li);
-    });
+  if (type === 'Atomic') {
+    renderAtomicDetails(section, data);
+  } else if (type === 'CPPN') {
+    renderCPPNDetails(section, data);
+  } else if (type === 'CPPS') {
+    renderCPPSDetails(section, data);
+  } else {
+    section.innerHTML = '<p class="text-muted">Unknown service type.</p>';
   }
+}
 
-  if (data.output_params) {
-    data.output_params.forEach(o => {
+function renderAtomicDetails(section, data) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'atomic-details-wrapper';
+
+  const title = document.createElement('h5');
+  title.className = 'mb-3 fw-bold';
+  title.textContent = 'Details: Atomic Service';
+  wrapper.appendChild(title);
+
+  const nameP = document.createElement('p');
+  nameP.innerHTML = `<strong>Name:</strong> ${data.name || '-'}`;
+  wrapper.appendChild(nameP);
+
+  const row = document.createElement('div');
+  row.className = 'd-flex justify-content-between gap-5 flex-wrap';
+
+  // Input column
+  const inputCol = document.createElement('div');
+  const inputTitle = document.createElement('h6');
+  inputTitle.textContent = 'Input:';
+  inputCol.appendChild(inputTitle);
+  const inputList = document.createElement('ul');
+  (data.input_params || []).forEach(i => {
+    const li = document.createElement('li');
+    li.textContent = `- ${i}`;
+    inputList.appendChild(li);
+  });
+  inputCol.appendChild(inputList);
+
+  // Output column
+  const outputCol = document.createElement('div');
+  const outputTitle = document.createElement('h6');
+  outputTitle.textContent = 'Output:';
+  outputCol.appendChild(outputTitle);
+  const outputList = document.createElement('ul');
+  (data.output_params || []).forEach(o => {
+    const li = document.createElement('li');
+    li.textContent = `- ${o}`;
+    outputList.appendChild(li);
+  });
+  outputCol.appendChild(outputList);
+
+  // Meta column
+  const metaCol = document.createElement('div');
+  const metaList = document.createElement('ul');
+  ['atomic_type', 'url', 'method'].forEach(k => {
+    if (data[k]) {
       const li = document.createElement('li');
-      li.textContent = o;
-      document.getElementById('output-list').appendChild(li);
-    });
-  }
+      li.innerHTML = `<strong>${k}:</strong> ${data[k]}`;
+      metaList.appendChild(li);
+    }
+  });
+  metaCol.appendChild(metaList);
 
-  ['name', 'description', 'atomic_type', 'actor', 'actors', 'url', 'method'].forEach(k => {
+  // Append columns to row
+  row.appendChild(inputCol);
+  row.appendChild(outputCol);
+  row.appendChild(metaCol);
+
+  wrapper.appendChild(row);
+  section.innerHTML = '';
+  section.appendChild(wrapper);
+}
+
+function renderCPPNDetails(section, data) {
+  const title = document.createElement('h6');
+  title.className = 'text-muted';
+  title.textContent = 'CPPN Service';
+  section.appendChild(title);
+
+  const fields = ['name', 'description', 'workflow_type'];
+  fields.forEach(k => {
     if (data[k]) {
       const p = document.createElement('p');
-      p.innerHTML = `<strong>${k}:</strong> ${Array.isArray(data[k]) ? data[k].join(', ') : data[k]}`;
+      p.innerHTML = `<strong>${k}:</strong> ${data[k]}`;
       section.appendChild(p);
     }
   });
+
+  // Actors
+  if (Array.isArray(data.actors)) {
+    const actorsTitle = document.createElement('h6');
+    actorsTitle.textContent = 'Actors';
+    section.appendChild(actorsTitle);
+    const ul = document.createElement('ul');
+    data.actors.forEach(actor => {
+      const li = document.createElement('li');
+      li.textContent = actor;
+      ul.appendChild(li);
+    });
+    section.appendChild(ul);
+  }
+
+  // GDPR Map
+  if (data.gdpr_map && typeof data.gdpr_map === 'object') {
+    const gdprTitle = document.createElement('h6');
+    gdprTitle.textContent = 'GDPR Map';
+    section.appendChild(gdprTitle);
+    const dl = document.createElement('dl');
+    for (const [actor, role] of Object.entries(data.gdpr_map)) {
+      const dt = document.createElement('dt');
+      dt.textContent = actor;
+      const dd = document.createElement('dd');
+      dd.textContent = role;
+      dl.appendChild(dt);
+      dl.appendChild(dd);
+    }
+    section.appendChild(dl);
+  }
 }
+
+function renderCPPSDetails(section, data) {
+  const title = document.createElement('h6');
+  title.className = 'text-muted';
+  title.textContent = 'CPPS Service';
+  section.appendChild(title);
+
+  const fields = ['name', 'description', 'workflow_type', 'actor'];
+  fields.forEach(k => {
+    if (data[k]) {
+      const p = document.createElement('p');
+      p.innerHTML = `<strong>${k}:</strong> ${data[k]}`;
+      section.appendChild(p);
+    }
+  });
+
+  // Endpoints
+  if (Array.isArray(data.endpoints)) {
+    const endpointsTitle = document.createElement('h6');
+    endpointsTitle.textContent = 'Endpoints';
+    section.appendChild(endpointsTitle);
+    const ul = document.createElement('ul');
+    data.endpoints.forEach(ep => {
+      const li = document.createElement('li');
+      li.textContent = `${ep.method || 'GET'} ${ep.url || ''}`;
+      ul.appendChild(li);
+    });
+    section.appendChild(ul);
+  }
+}
+
+
 
 function renderNotFound(id) {
   const section = document.querySelector('.details-section');

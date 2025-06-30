@@ -12,6 +12,43 @@
   <link rel="stylesheet" href="https://unpkg.com/bpmn-js@18.3.1/dist/assets/diagram-js.css">
   <link rel="stylesheet" href="https://unpkg.com/bpmn-js@18.3.1/dist/assets/bpmn-font/css/bpmn.css">
   <link href="{% static 'css/editor.css' %}" rel="stylesheet">
+  <style>
+  footer {
+    max-height: 180px;
+    overflow-y: auto;
+    overflow-x: auto;
+    font-size: 0.875rem;
+    line-height: 1.2;
+    padding: 0.75rem 1rem;
+  }
+
+  .atomic-details-wrapper h5,
+  .atomic-details-wrapper h6 {
+    margin: 0.25rem 0;
+    font-size: 1rem;
+  }
+
+  .atomic-details-wrapper p,
+  .atomic-details-wrapper li {
+    margin: 0.2rem 0;
+  }
+
+  .atomic-details-wrapper ul {
+    padding-left: 1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .atomic-details-wrapper .d-flex > div {
+    min-width: 180px;
+  }
+
+  .atomic-details-wrapper {
+    min-width: 600px;
+  }
+</style>
+
+
+
   
   {% block extra_css %}{% endblock %}
 </head>
