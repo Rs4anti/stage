@@ -10,6 +10,7 @@ from drf_spectacular.utils import extend_schema_view, extend_schema, OpenApiResp
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.http import JsonResponse
+from bson import ObjectId
 
 
 def data_view_editor(request):
@@ -45,28 +46,31 @@ def save_diagram(request):
 
 @api_view(['POST'])
 def save_atomic_service(request):
+    from bson import ObjectId
+
     data = request.data
     print("=== Payload received:", data)
 
     required_fields = ['diagram_id', 'task_id', 'name', 'atomic_type', 'input_params', 'output_params', 'method', 'url']
-
-
-    #TODO: c'è gia validazione in js lato client!! (NON SERVE)
     missing = [f for f in required_fields if f not in data]
-
     if missing:
-        return Response({'error': f'Missing fields: {", ".join(missing)}'}, status=status.HTTP_400_BAD_REQUEST)    
+        return Response({'error': f'Missing fields: {", ".join(missing)}'}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        #verifico che diagramma esista
-        diagram = BPMNDiagram.objects.get(id=data['diagram_id'])
+        diagram_id = ObjectId(data['diagram_id'])
+    except Exception:
+        return Response({'error': 'Invalid diagram ID'}, status=status.HTTP_400_BAD_REQUEST)
 
+    diagram = bpmn_collection.find_one({'_id': diagram_id})
+    if not diagram:
+        return Response({'error': 'Diagram not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        #salva o aggiorna l'atomic in mongo (activity_id univoco)
+    try:
         result = atomic_services_collection.update_one(
-             {'task_id': data['task_id']},
+            {'task_id': data['task_id']},
             {
                 '$set': {
+                    'diagram_id': str(diagram_id),
                     'name': data['name'],
                     'atomic_type': data['atomic_type'],
                     'input_params': data['input_params'],
@@ -75,18 +79,17 @@ def save_atomic_service(request):
                     'url': data['url']
                 }
             },
-            upsert=True #mix di update e insert
+            upsert=True
         )
 
         created = result.upserted_id is not None
         print("=== Atomic saved in Mongo. created:", created)
 
         return Response({'status': 'ok', 'created': created})
-        
-    except BPMNDiagram.DoesNotExist:
-            return Response({'error': 'Diagram not found'}, status=status.HTTP_404_NOT_FOUND)
+
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 @api_view(['POST'])
 def save_cppn_service(request):
