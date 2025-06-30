@@ -93,10 +93,7 @@ bpmnModeler.get('eventBus').on('element.click', function (e) {
     openGroupClassificationForm(el);
   }
 
-   if (el && el.type === 'bpmn:Participant') {
-    console.log('chiamo logLaneName');
-    logParticipantName(el);
-  }
+  loadDetailsFromMongo(el);
 
 });
 
@@ -108,9 +105,78 @@ $('#save-button').click(saveDiagram);
 
 resetDiagram();
 
-function logParticipantName(element) {
-  const name = element.businessObject.name || '(nessun nome)';
-  console.log('Nome attore (participant/pool):', name);
+
+async function loadDetailsFromMongo(element) {
+  const bo = element.businessObject;
+  const type = element.type;
+  const id = bo.id;
+
+  let endpoint = null;
+  if (type === 'bpmn:Task') {
+    endpoint = `/editor/api/atomic_service/${id}/`;
+  } else if (type === 'bpmn:Group') {
+    try {
+      const res = await fetch(`/editor/api/cppn_service/${id}/`);
+      if (res.ok) {
+        const data = await res.json();
+        return renderDetails(data, 'CPPN');
+      }
+    } catch (_) {}
+
+    try {
+      const res = await fetch(`/editor/api/cpps_service/${id}/`);
+      if (res.ok) {
+        const data = await res.json();
+        return renderDetails(data, 'CPPS');
+      }
+    } catch (_) {}
+
+    renderNotFound(id);
+    return;
+  }
+
+  if (endpoint) {
+    try {
+      const res = await fetch(endpoint);
+      if (!res.ok) throw new Error("Not found");
+      const data = await res.json();
+      renderDetails(data, 'Atomic');
+    } catch (err) {
+      renderNotFound(id);
+    }
+  }
 }
 
+function renderDetails(data, type) {
+  const section = document.querySelector('.details-section');
+  section.innerHTML = `<h6>Type: ${type}</h6><ul id="input-list"></ul><h6>Output</h6><ul id="output-list"></ul>`;
 
+  if (data.input_params) {
+    data.input_params.forEach(i => {
+      const li = document.createElement('li');
+      li.textContent = i;
+      document.getElementById('input-list').appendChild(li);
+    });
+  }
+
+  if (data.output_params) {
+    data.output_params.forEach(o => {
+      const li = document.createElement('li');
+      li.textContent = o;
+      document.getElementById('output-list').appendChild(li);
+    });
+  }
+
+  ['name', 'description', 'atomic_type', 'actor', 'actors', 'url', 'method'].forEach(k => {
+    if (data[k]) {
+      const p = document.createElement('p');
+      p.innerHTML = `<strong>${k}:</strong> ${Array.isArray(data[k]) ? data[k].join(', ') : data[k]}`;
+      section.appendChild(p);
+    }
+  });
+}
+
+function renderNotFound(id) {
+  const section = document.querySelector('.details-section');
+  section.innerHTML = `<p class="text-muted">No service found for <code>${id}</code>.</p>`;
+}

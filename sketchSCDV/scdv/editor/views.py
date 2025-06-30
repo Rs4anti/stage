@@ -293,3 +293,27 @@ def atomic_service_schema(request, task_id):
         }
 
     return JsonResponse(schema)
+
+
+@api_view(['GET'])
+def get_cppn_service(request, group_id):
+    service = cppn_collection.find_one({'group_id': group_id})
+    if not service:
+        return Response({'error': 'CPPN not found'}, status=404)
+    return Response(service)
+
+@api_view(['GET'])
+def get_cpps_service(request, group_id):
+    service = cpps_collection.find_one({'group_id': group_id})
+    if not service:
+        return Response({'error': 'CPPS not found'}, status=404)
+    return Response(service)
+
+from bson import json_util
+
+@api_view(['GET'])
+def get_atomic_service(request, task_id):
+    service = atomic_services_collection.find_one({'task_id': task_id})
+    if not service:
+        return JsonResponse({'error': 'Atomic service not found'}, status=404)
+    return JsonResponse(service, safe=False, json_dumps_params={'default': json_util.default})
