@@ -143,11 +143,19 @@ def save_cpps_service(request):
     if missing:
         return Response({'error': f'Missing fields: {", ".join(missing)}'}, status=400)
 
+    from bson import ObjectId
     try:
-        diagram = BPMNDiagram.objects.get(id=data['diagram_id'])
+        diagram_id = ObjectId(data['diagram_id'])
+    except Exception:
+        return Response({'error': 'Invalid diagram ID'}, status=400)
 
+    diagram = bpmn_collection.find_one({'_id': diagram_id})
+    if not diagram:
+        return Response({'error': 'Diagram not found'}, status=404)
+
+    try:
         doc = {
-            'diagram_id': data['diagram_id'],
+            'diagram_id': str(diagram_id),
             'group_id': data['group_id'],
             'name': data['name'],
             'description': data['description'],
@@ -164,10 +172,9 @@ def save_cpps_service(request):
         )
 
         return Response({'status': 'ok', 'created': result.upserted_id is not None})
-    except BPMNDiagram.DoesNotExist:
-        return Response({'error': 'Diagram not found'}, status=404)
     except Exception as e:
         return Response({'error': str(e)}, status=500)
+
     
 
 class AtomicServiceSchemaView(APIView):
