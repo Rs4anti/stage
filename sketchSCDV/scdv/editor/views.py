@@ -31,16 +31,49 @@ def swagger_viewer(request, task_id):
     schema_url = f"{base_url}/editor/schema/atomic/{task_id}/"
     return render(request, 'editor/swagger_viewer.html', {'schema_url': schema_url})
 
-@api_view(['POST'])
-def save_diagram(request):
+from bson.errors import InvalidId
+
+@api_view(['POST', 'PUT', 'GET'])
+def save_diagram(request, diagram_id=None):
     data = request.data
-    diagram = {
-        "name": data['name'],
-        "xml_content": data['xml_content'],
-        "created_at": now()
-    }
-    result = bpmn_collection.insert_one(diagram)
-    return Response({'id': str(result.inserted_id), 'status': 'saved'})
+
+    if request.method == 'GET':
+        try:
+            object_id = ObjectId(diagram_id)
+        except InvalidId:
+            return Response({'error': 'Invalid ID'}, status=400)
+
+        exists = bpmn_collection.find_one({'_id': object_id})
+        if exists:
+            return Response({'status': 'exists'})
+        else:
+            return Response({'error': 'Not found'}, status=404)
+
+    if request.method == 'POST':
+        diagram = {
+            "name": data['name'],
+            "xml_content": data['xml_content'],
+            "created_at": now()
+        }
+        result = bpmn_collection.insert_one(diagram)
+        return Response({'id': str(result.inserted_id), 'status': 'saved'})
+
+    elif request.method == 'PUT':
+        if not diagram_id:
+            return Response({'error': 'Diagram ID is required'}, status=400)
+
+        result = bpmn_collection.update_one(
+            {"_id": ObjectId(diagram_id)},
+            {"$set": {
+                "xml_content": data['xml_content'],
+                "updated_at": now()
+            }}
+        )
+
+        if result.matched_count == 0:
+            return Response({'error': 'Diagram not found'}, status=404)
+
+        return Response({'id': diagram_id, 'status': 'updated'})
 
 
 

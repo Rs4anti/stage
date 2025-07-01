@@ -3,7 +3,10 @@ from . import views
 
 urlpatterns = [
     path('', views.data_view_editor, name='editor'),
-    path('api/save-diagram/', views.save_diagram, name='save_diagram'),
+
+    path('api/save-diagram/', views.save_diagram),  # POST
+    path('api/save-diagram/<str:diagram_id>/', views.save_diagram),  # PUT
+
     path('api/save-atomic-service/', views.save_atomic_service, name='save_atomic_service'),
     path('api/atomic_service/<str:task_id>/', views.get_atomic_service, name='get_atomic_service'),
 

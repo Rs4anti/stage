@@ -50,36 +50,74 @@ async function saveDiagram() {
     const { xml } = await bpmnModeler.saveXML({ format: true });
     console.log(xml);
 
-    const name = prompt("Inserisci un nome per il diagramma:");
-    if (!name) return;
-
+    let diagramId = localStorage.getItem('diagramId');
     const csrftoken = getCookie('csrftoken');
 
-    const response = await fetch('/editor/api/save-diagram/', {
-      method: 'POST',
+    let url = '/editor/api/save-diagram/';
+    let method = 'POST';
+    let body = {
+      xml_content: xml
+    };
+
+    // ✅ Verifica se l'ID esiste davvero nel backend
+    if (diagramId) {
+  const check = await fetch(`/editor/api/save-diagram/${diagramId}/`, { method: 'GET' });
+
+  if (check.ok) {
+    console.log("📂 Diagramma già esistente. Procedo con PUT.");
+    url += `${diagramId}/`;
+    method = 'PUT';
+  } else {
+    console.log("🆕 L'ID salvato non corrisponde a un diagramma. Procedo con POST.");
+    diagramId = null;
+    localStorage.removeItem('diagramId');
+  }
+}
+
+
+    // Se nuovo, chiedi nome
+    if (!diagramId) {
+      const name = prompt("Inserisci un nome per il diagramma:");
+      if (!name) return;
+      body.name = name;
+    }
+
+    const response = await fetch(url, {
+      method,
       headers: {
         'Content-Type': 'application/json',
         'X-CSRFToken': csrftoken
       },
-      body: JSON.stringify({
-        name: name,
-        xml_content: xml
-      })
+      body: JSON.stringify(body)
     });
 
-    const data = await response.json();
+    const responseText = await response.text();
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("❌ Errore di parsing JSON. Risposta ricevuta:", responseText);
+      alert("❌ Errore dal server: risposta non valida.");
+      return;
+    }
 
     if (response.ok) {
-      alert("Diagramma salvato con successo!");
-      localStorage.setItem('diagramId', data.id);
-      window.diagramId = data.id;  // rende disponibile globalmente
+      alert("✅ Diagramma salvato con successo!");
+      if (!diagramId) {
+        localStorage.setItem('diagramId', data.id);
+        window.diagramId = data.id;
+      }
     } else {
-      alert("Errore nel salvataggio del diagramma. Risposta backend: \n" + JSON.stringify(data));
+      alert("⚠️ Errore nel salvataggio:\n" + JSON.stringify(data));
     }
   } catch (err) {
-    console.error("Errore durante l'esportazione/salvataggio:", err);
+    console.error("❌ Errore durante il salvataggio:", err);
+    alert("❌ Errore imprevisto.");
   }
 }
+
+
+
 
 bpmnModeler.get('eventBus').on('element.click', function (e) {
   const el = e.element;
@@ -98,8 +136,11 @@ bpmnModeler.get('eventBus').on('element.click', function (e) {
 });
 
 function resetDiagram() {
+  localStorage.removeItem('diagramId');
+  delete window.diagramId;
   openDiagram(emptyDiagram);
 }
+
 
 $('#save-button').click(saveDiagram);
 
