@@ -142,7 +142,11 @@ function resetDiagram() {
 }
 
 
-$('#save-button').click(saveDiagram);
+$(document).ready(function () {
+  $('#save-button1').click(saveDiagram);
+  resetDiagram();
+});
+
 
 resetDiagram();
 

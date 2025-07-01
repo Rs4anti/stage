@@ -42,28 +42,35 @@ function openAtomicServiceForm(element, isNew = false) {
 }
 
 // Chiudi e rimuovi task vuoti
-document.getElementById('atomicServiceModal').addEventListener('hidden.bs.modal', function () {
-  if (!isNewTask || !currentElement) return;
+document.addEventListener('DOMContentLoaded', function () {
+  const modalEl = document.getElementById('atomicServiceModal');
 
-  const isFormEmpty =
-    !document.getElementById('serviceName').value.trim() &&
-    !document.getElementById('inputParams').value.trim() &&
-    !document.getElementById('outputParams').value.trim() &&
-    !document.getElementById('serviceUrl').value.trim();
+  if (modalEl) {
+    modalEl.addEventListener('hidden.bs.modal', function () {
+      if (!isNewTask || !currentElement) return;
 
-  if (isFormEmpty) {
-    const modeling = window.bpmnModeler.get('modeling');
-    const elementRegistry = window.bpmnModeler.get('elementRegistry');
-    const element = elementRegistry.get(currentElement.id);
-    if (element) {
-      modeling.removeElements([element]);
-      showToast("Task rimosso perché non configurato.");
-    }
+      const isFormEmpty =
+        !document.getElementById('serviceName').value.trim() &&
+        !document.getElementById('inputParams').value.trim() &&
+        !document.getElementById('outputParams').value.trim() &&
+        !document.getElementById('serviceUrl').value.trim();
+
+      if (isFormEmpty) {
+        const modeling = window.bpmnModeler.get('modeling');
+        const elementRegistry = window.bpmnModeler.get('elementRegistry');
+        const element = elementRegistry.get(currentElement.id);
+        if (element) {
+          modeling.removeElements([element]);
+          showToast("Task rimosso perché non configurato.");
+        }
+      }
+
+      isNewTask = false;
+      currentElement = null;
+    });
   }
-
-  isNewTask = false;
-  currentElement = null;
 });
+
 
 function showToast(message) {
   const toastEl = document.getElementById('taskToast');
