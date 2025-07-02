@@ -36,23 +36,38 @@
   });
 
   document.getElementById('uploadBtn').addEventListener('click', async () => {
-    if (!fileContent) return alert("⚠️ No file selected.");
+  if (!fileContent) return alert("⚠️ Nessun file selezionato.");
 
-    const name = prompt("Insert a diagram name:");
-    if (!name) return;
+  const name = prompt("Inserisci un nome per il diagramma:");
+  if (!name) return;
 
-    const res = await fetch('/importer/upload/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, xml_content: fileContent })
-    });
+  // ⛔ Verifica se esiste già (case-insensitive)
+  const check = await fetch(`/editor/api/check-name/?name=${encodeURIComponent(name)}`);
+  if (!check.ok) {
+    alert("❌ Errore durante la verifica del nome.");
+    return;
+  }
 
-    if (res.ok) {
-      const data = await res.json();
-      window.location.href = `/editor/?id=${data.id}`;
-    } else {
-      alert("❌ Errore durante l'import.");
-    }
+  const checkData = await check.json();
+  if (checkData.exists) {
+    alert("⚠️ Esiste già un diagramma con questo nome. Scegli un altro nome.");
+    return;
+  }
+
+  // ✅ Procedi con l’import
+  const res = await fetch('/importer/upload/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, xml_content: fileContent })
   });
+
+  if (res.ok) {
+    const data = await res.json();
+    window.location.href = `/editor/?id=${data.id}`;
+  } else {
+    alert("❌ Errore durante l'import.");
+  }
+});
+
 </script>
 {% endblock %}
