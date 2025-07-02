@@ -10,17 +10,17 @@ def importer_home(request):
 
 
 @api_view(['POST'])
-def import_diagram(request):
-    file = request.FILES.get('bpmn_file')
-    if not file:
-        return Response({'error': 'No file provided'}, status=400)
+def upload_imported_diagram(request):
+    name = request.data.get('name')
+    xml = request.data.get('xml_content')
 
-    content = file.read().decode('utf-8')
-    name = f"Imported_{uuid.uuid4().hex[:6]}"
+    if not name or not xml:
+        return Response({'error': 'Missing data'}, status=400)
 
     result = bpmn_collection.insert_one({
         'name': name,
-        'xml_content': content
+        'xml_content': xml
     })
 
     return Response({'id': str(result.inserted_id)})
+
