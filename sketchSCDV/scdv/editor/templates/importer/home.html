@@ -1,19 +1,26 @@
 {% extends "base.html" %}
-{% block title %}Importa Diagramma BPMN{% endblock %}
+{% block title %}Import BPMN Diagram{% endblock %}
 
 {% block content %}
 <div class="container py-4">
-  <h2 class="text-center mb-4">📥 Importa Supply Chain Data View</h2>
+
+  <!-- Intestazione + bottone torna alla home -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">📥 Import Supply Chain Data View</h2>
+    <a href="{% url 'homepage' %}" class="btn btn-outline-primary">
+      <i class="bi bi-house-door"></i> Home
+    </a>
+  </div>
 
   <!-- Upload file -->
   <div class="mb-3">
-    <label class="form-label">Carica file BPMN:</label>
+    <label class="form-label">Upload BPMN file:</label>
     <input type="file" id="bpmnFile" class="form-control" accept=".bpmn,.xml">
   </div>
 
   <!-- Azioni -->
   <div class="mt-4 text-center">
-    <button id="uploadBtn" class="btn btn-success">💾 Importa e Modifica</button>
+    <button id="uploadBtn" class="btn btn-success">💾 Upload and Edit</button>
   </div>
 </div>
 {% endblock %}
@@ -29,9 +36,9 @@
   });
 
   document.getElementById('uploadBtn').addEventListener('click', async () => {
-    if (!fileContent) return alert("⚠️ Nessun file selezionato.");
+    if (!fileContent) return alert("⚠️ No file selected.");
 
-    const name = prompt("Inserisci un nome per il diagramma:");
+    const name = prompt("Insert a diagram name:");
     if (!name) return;
 
     const res = await fetch('/importer/upload/', {
@@ -42,7 +49,7 @@
 
     if (res.ok) {
       const data = await res.json();
-      window.location.href = `/editor/?id=${data.id}`;  // editor.js si occuperà di tutto
+      window.location.href = `/editor/?id=${data.id}`;
     } else {
       alert("❌ Errore durante l'import.");
     }
