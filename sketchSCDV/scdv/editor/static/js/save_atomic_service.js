@@ -1,5 +1,3 @@
-let diagramId = window.diagramId;
-
 async function saveAtomicService() {
     console.log('Funzione saveAtomicService chiamata');
 
@@ -7,6 +5,9 @@ async function saveAtomicService() {
         console.log('currentElement è nullo');
         return;
     }
+
+    // Recupera il diagramId correttamente
+    let diagramId = window.diagramId || localStorage.getItem('diagramId');
 
     const name = document.getElementById('serviceName').value;
     const atomicType = document.getElementById('atomicType').value;
@@ -20,14 +21,14 @@ async function saveAtomicService() {
     }
 
     const csrftoken = getCookie('csrftoken');
-    
+
+    // Se il diagramId non è ancora salvato o non valido, salva prima il diagramma
     if (!diagramId) {
         const { xml } = await bpmnModeler.saveXML({ format: true });
 
         const diagramName = prompt("Prima di salvare l'atomic service, inserisci un nome per il diagramma:");
         if (!diagramName) return;
 
-        // Salvataggio diagramma
         const diagramResponse = await fetch('/editor/api/save-diagram/', {
             method: 'POST',
             headers: {
@@ -42,8 +43,11 @@ async function saveAtomicService() {
 
         const diagramData = await diagramResponse.json();
         diagramId = diagramData.id;
+        window.diagramId = diagramId;
+        localStorage.setItem('diagramId', diagramId);
     }
 
+    // Aggiunta estensione custom all’elemento BPMN selezionato
     const moddle = bpmnModeler.get('moddle');
     const modeling = bpmnModeler.get('modeling');
 
@@ -64,6 +68,7 @@ async function saveAtomicService() {
         extensionElements
     });
 
+    // Salvataggio atomic service sul backend
     try {
         const response = await fetch('/editor/api/save-atomic-service/', {
             method: 'POST',
@@ -72,7 +77,7 @@ async function saveAtomicService() {
                 'X-CSRFToken': csrftoken
             },
             body: JSON.stringify({
-                diagram_id: diagramId, 
+                diagram_id: diagramId,
                 task_id: currentElement.id,
                 name,
                 atomic_type: atomicType,
@@ -84,22 +89,23 @@ async function saveAtomicService() {
         });
 
         const result = await response.json();
-        console.log(result);
 
         if (response.ok) {
-            console.log("Atomic service salvato con successo!", result);
+            console.log("✅ Atomic service salvato con successo!", result);
         } else {
-            console.error("Errore salvataggio:", result);
+            console.error("❌ Errore salvataggio:", result);
             alert("Errore durante il salvataggio dell'atomic service.");
         }
     } catch (err) {
-        console.error("Errore rete/API:", err);
+        console.error("❌ Errore rete/API:", err);
         alert("Errore di comunicazione con il server.");
     }
 
+    // Chiudi il modal
     bootstrap.Modal.getInstance(document.getElementById('atomicServiceModal')).hide();
 
-    const saveAtomicServiceData = {
+    // Memorizza dati dell’atomic service per uso futuro
+    window.saveAtomicServiceData = {
         name,
         atomic_type: atomicType,
         input_params: inputParams,
@@ -107,9 +113,7 @@ async function saveAtomicService() {
         method,
         url
     };
-    window.saveAtomicServiceData = saveAtomicServiceData;
 }
-
 
 
 function validateAtomicServiceFields({ name, atomicType, inputParams, outputParams, method, url }) {
@@ -138,10 +142,10 @@ function validateAtomicServiceFields({ name, atomicType, inputParams, outputPara
         return false;
     }
 
-    if (!url.trim() || !/^\/[a-zA-Z0-9_]+$/.test(url)) { 
+    if (!url.trim() || !/^\/[a-zA-Z0-9_]+$/.test(url)) {
         alert("L'URL è obbligatorio o non valido. Deve iniziare con '/' e contenere solo lettere, numeri o underscore.");
         return false;
     }
-    
+
     return true;
 }

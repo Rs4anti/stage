@@ -59,16 +59,16 @@ async function saveDiagram() {
       xml_content: xml
     };
 
-    // ✅ Verifica se l'ID esiste davvero nel backend
+    //Verifica se l'ID esiste nel backend
     if (diagramId) {
   const check = await fetch(`/editor/api/save-diagram/${diagramId}/`, { method: 'GET' });
 
   if (check.ok) {
-    console.log("📂 Diagramma già esistente. Procedo con PUT.");
+    console.log("Diagram already exist-> PUT.");
     url += `${diagramId}/`;
     method = 'PUT';
   } else {
-    console.log("🆕 L'ID salvato non corrisponde a un diagramma. Procedo con POST.");
+    console.log("ID is not associated at any diagram -> POST.");
     diagramId = null;
     localStorage.removeItem('diagramId');
   }
@@ -102,12 +102,11 @@ async function saveDiagram() {
     }
 
     if (response.ok) {
-      alert("✅ Diagramma salvato con successo!");
-      if (!diagramId) {
-        localStorage.setItem('diagramId', data.id);
-        window.diagramId = data.id;
-      }
-    } else {
+  alert("✅ Diagramma salvato con successo!");
+  localStorage.setItem('diagramId', data.id);
+  window.diagramId = data.id;
+}
+else {
       alert("⚠️ Errore nel salvataggio:\n" + JSON.stringify(data));
     }
   } catch (err) {
@@ -144,7 +143,7 @@ function resetDiagram() {
 
 $(document).ready(function () {
   $('#save-button1').click(saveDiagram);
-  resetDiagram();
+  $('#reset-button').click(resetDiagram);
 });
 
 

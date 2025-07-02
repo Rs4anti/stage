@@ -2,6 +2,8 @@ from django.shortcuts import render
 from mongodb_handler import bpmn_collection
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from django.shortcuts import render, Http404
+from bson.objectid import ObjectId
 
 def data_view_editor(request):
     return render(request, 'viewer/viewer.html')
@@ -37,6 +39,19 @@ def get_diagram(request, diagram_id):
         'name': diagram.get('name', ''),
         'xml_content': diagram['xml_content']
     })
+
+
+def view_diagram_by_name(request, diagram_name):
+    diagram = bpmn_collection.find_one({'name': diagram_name})
+    if not diagram:
+        raise Http404("Diagramma non trovato")
+
+    return render(request, 'viewer/view_diagram.html', {
+        'diagram_name': diagram['name'],
+        'diagram_xml': diagram['xml_content']
+    })
+
+
 
 
 
