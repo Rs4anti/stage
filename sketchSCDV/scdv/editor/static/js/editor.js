@@ -59,29 +59,43 @@ async function saveDiagram() {
       xml_content: xml
     };
 
-    //Verifica se l'ID esiste nel backend
+    // 🔍 Verifica se esiste già un diagramma con quell'ID
     if (diagramId) {
-  const check = await fetch(`/editor/api/save-diagram/${diagramId}/`, { method: 'GET' });
+      const check = await fetch(`/editor/api/save-diagram/${diagramId}/`, { method: 'GET' });
 
-  if (check.ok) {
-    console.log("Diagram already exist-> PUT.");
-    url += `${diagramId}/`;
-    method = 'PUT';
-  } else {
-    console.log("ID is not associated at any diagram -> POST.");
-    diagramId = null;
-    localStorage.removeItem('diagramId');
-  }
-}
+      if (check.ok) {
+        console.log("📂 Diagramma già esistente → PUT");
+        url += `${diagramId}/`;
+        method = 'PUT';
+      } else {
+        console.log("🆕 L'ID salvato non corrisponde a un diagramma → POST");
+        diagramId = null;
+        localStorage.removeItem('diagramId');
+      }
+    }
 
-
-    // Se nuovo, chiedi nome
+    // 🧠 Se nuovo, chiedi nome e verifica univocità
     if (!diagramId) {
       const name = prompt("Inserisci un nome per il diagramma:");
       if (!name) return;
+
+      // ✅ Verifica se esiste già un diagramma con questo nome
+      const nameCheck = await fetch(`/editor/api/check-name/?name=${encodeURIComponent(name)}`);
+      if (!nameCheck.ok) {
+        alert("❌ Errore durante la verifica del nome.");
+        return;
+      }
+
+      const nameExists = await nameCheck.json();
+      if (nameExists.exists) {
+        alert("⚠️ Esiste già un diagramma con questo nome. Scegli un altro nome.");
+        return;
+      }
+
       body.name = name;
     }
 
+    // 📨 Salvataggio
     const response = await fetch(url, {
       method,
       headers: {
@@ -96,17 +110,16 @@ async function saveDiagram() {
     try {
       data = JSON.parse(responseText);
     } catch (parseError) {
-      console.error("❌ Errore di parsing JSON. Risposta ricevuta:", responseText);
+      console.error("❌ Errore di parsing JSON:", responseText);
       alert("❌ Errore dal server: risposta non valida.");
       return;
     }
 
     if (response.ok) {
-  alert("✅ Diagramma salvato con successo!");
-  localStorage.setItem('diagramId', data.id);
-  window.diagramId = data.id;
-}
-else {
+      alert("✅ Diagramma salvato con successo!");
+      localStorage.setItem('diagramId', data.id);
+      window.diagramId = data.id;
+    } else {
       alert("⚠️ Errore nel salvataggio:\n" + JSON.stringify(data));
     }
   } catch (err) {
@@ -114,6 +127,7 @@ else {
     alert("❌ Errore imprevisto.");
   }
 }
+
 
 
 

@@ -18,5 +18,7 @@ urlpatterns = [
     path('docs/atomic/view/<str:task_id>/', views.swagger_viewer, name='swagger-viewer'),
     path('api/cppn_service/<str:group_id>/', views.get_cppn_service, name='get_cppn_service'),
     path('api/cpps_service/<str:group_id>/', views.get_cpps_service, name='get_cpps_service'),
+    path('api/check-name/', views.check_diagram_name, name='check_diagram_name'),
+
 
 ]

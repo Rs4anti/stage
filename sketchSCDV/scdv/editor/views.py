@@ -11,6 +11,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.http import JsonResponse
 from bson import ObjectId
+from bson.errors import InvalidId
 
 
 def data_view_editor(request):
@@ -31,7 +32,15 @@ def swagger_viewer(request, task_id):
     schema_url = f"{base_url}/editor/schema/atomic/{task_id}/"
     return render(request, 'editor/swagger_viewer.html', {'schema_url': schema_url})
 
-from bson.errors import InvalidId
+def check_diagram_name(request):
+    name = request.GET.get('name')
+    if not name:
+        return JsonResponse({'error': 'Missing name'}, status=400)
+
+    # Confronto case-insensitive
+    exists = bpmn_collection.find_one({ 'name': { '$regex': f'^{name}$', '$options': 'i' } }) is not None
+    return JsonResponse({'exists': exists})
+
 
 @api_view(['POST', 'PUT', 'GET'])
 def save_diagram(request, diagram_id=None):
