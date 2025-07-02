@@ -29,8 +29,14 @@ def atomic_docs_page(request):
 
 def swagger_viewer(request, task_id):
     base_url = request.build_absolute_uri('/').rstrip('/')
-    schema_url = f"{base_url}/editor/schema/atomic/{task_id}/"
+    schema_type = request.GET.get("type", "atomic")  # "atomic", "cpps", "cppn"
+
+    if schema_type not in ["atomic", "cpps", "cppn"]:
+        schema_type = "atomic"
+
+    schema_url = f"{base_url}/editor/schema/{schema_type}/{task_id}/"
     return render(request, 'editor/swagger_viewer.html', {'schema_url': schema_url})
+
 
 def check_diagram_name(request):
     name = request.GET.get('name')
@@ -367,3 +373,157 @@ def get_atomic_service(request, task_id):
     if not service:
         return JsonResponse({'error': 'Atomic service not found'}, status=404)
     return JsonResponse(service, safe=False, json_dumps_params={'default': json_util.default})
+
+
+class CPPSServiceSchemaView(APIView):
+    """
+    Dynamic OpenAPI 3.1 schema for CPPS services stored in MongoDB.
+    """
+
+    def get(self, request):
+        paths = {}
+        cpps_docs = list(cpps_collection.find())
+
+        for doc in cpps_docs:
+            for ep in doc.get("endpoints", []):
+                path = ep.get("url")
+                method = ep.get("method", "POST").lower()
+
+                paths.setdefault(path, {})[method] = {
+                    "operationId": doc.get("name", "unnamed-cpps"),
+                    "summary": doc.get("description", ""),
+                    "tags": ["cpps"],
+                    "responses": {
+                        "200": {
+                            "description": "Success"
+                        }
+                    },
+                    "x-owner": doc.get("actor"),
+                    "x-members": doc.get("members", []),
+                    "x-workflow": doc.get("workflow_type", "sequence")
+                }
+
+        openapi = {
+            "openapi": "3.1.0",
+            "info": {
+                "title": "CPPS Services API",
+                "version": "1.0.0"
+            },
+            "paths": paths
+        }
+
+        return Response(openapi)
+
+
+class CPPNServiceSchemaView(APIView):
+    """
+    Dynamic OpenAPI 3.1 schema for CPPN services stored in MongoDB.
+    """
+
+    def get(self, request):
+        cppn_docs = list(cppn_collection.find())
+
+        # Non hanno endpoint diretti, ma includono metadata per estensioni x-
+        components = []
+        for doc in cppn_docs:
+            components.append({
+                "name": doc.get("name", "unnamed-cppn"),
+                "description": doc.get("description", ""),
+                "x-actors": doc.get("actors", []),
+                "x-gdpr-map": doc.get("gdpr_map", {}),
+                "x-members": doc.get("members", []),
+                "x-workflow": doc.get("workflow_type", "sequence")
+            })
+
+        openapi = {
+            "openapi": "3.1.0",
+            "info": {
+                "title": "CPPN Services API",
+                "version": "1.0.0"
+            },
+            "paths": {},  # Nessun path diretto
+            "x-cppn-services": components
+        }
+
+        return Response(openapi)
+
+
+@api_view(['GET'])
+def cpps_service_schema(request, group_id):
+    doc = cpps_collection.find_one({'group_id': group_id})
+    if not doc:
+        return JsonResponse({'error': 'CPPS not found'}, status=404)
+
+    paths = {}
+    for idx, ep in enumerate(doc.get("endpoints", [])):
+        path = ep.get("url")
+        method = ep.get("method", "POST").lower()
+
+        paths.setdefault(path, {})[method] = {
+            "operationId": f"{doc.get('name', 'cpps')}_{idx}",
+            "summary": doc.get("description", ""),
+            "responses": {
+                "200": {
+                    "description": "Execution success (internal CPPS orchestration)"
+                }
+            },
+            "tags": ["cpps"],
+            "x-owner": doc.get("actor"),
+            "x-members": doc.get("members", []),
+            "x-workflow": doc.get("workflow_type", "sequence")
+        }
+
+    schema = {
+        "openapi": "3.1.0",
+        "info": {
+            "title": f"CPPS Service: {doc.get('name', group_id)}",
+            "version": "1.0.0"
+        },
+        "paths": paths
+    }
+
+    return JsonResponse(schema)
+
+
+
+
+@api_view(['GET'])
+def cppn_service_schema(request, group_id):
+    doc = cppn_collection.find_one({'group_id': group_id})
+    if not doc:
+        return JsonResponse({'error': 'CPPN not found'}, status=404)
+
+    schema = {
+        "openapi": "3.1.0",
+        "info": {
+            "title": f"CPPN Service: {doc.get('name', group_id)}",
+            "version": "1.0.0"
+        },
+        "paths": {},  # Nessun endpoint diretto
+        "x-actors": doc.get("actors", []),
+        "x-members": doc.get("members", []),
+        "x-gdpr-map": doc.get("gdpr_map", {}),
+        "x-workflow": doc.get("workflow_type", "sequence")
+    }
+
+    return JsonResponse(schema)
+
+def cpps_docs_page(request):
+    services = list(cpps_collection.find())
+    base_url = request.build_absolute_uri('/').rstrip('/')
+
+    for s in services:
+        s['schema_url'] = f"{base_url}/editor/schema/cpps/{s['group_id']}/"
+
+    return render(request, 'editor/cpps_docs.html', {'services': services})
+
+
+def cppn_docs_page(request):
+    services = list(cppn_collection.find())
+    base_url = request.build_absolute_uri('/').rstrip('/')
+
+    for s in services:
+        s['schema_url'] = f"{base_url}/editor/schema/cppn/{s['group_id']}/"
+
+    return render(request, 'editor/cppn_docs.html', {'services': services})
+
