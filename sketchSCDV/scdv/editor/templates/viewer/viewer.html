@@ -1,16 +1,21 @@
 {% extends "base.html" %}
 
-{% block title %}Elenco Diagrammi - Supply Chain Viewer{% endblock %}
+{% block title %}Diagrams list - Supply Chain Viewer{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
-  <h2 class="mb-4 text-center">📚 Elenco dei Supply Chain Data View</h2>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0 text-center flex-grow-1">📚 Supply Chain Data View list</h2>
+    <a href="{% url 'homepage' %}" class="btn btn-outline-primary ms-3">
+      <i class="bi bi-house-door"></i> Home
+    </a>
+  </div>
 
   <table class="table table-striped table-bordered">
     <thead class="table-light">
       <tr>
         <th>Nome</th>
-        <th class="text-center">Azioni</th>
+        <th class="text-center">Actions</th>
       </tr>
     </thead>
     <tbody id="diagram-table-body">
@@ -19,6 +24,7 @@
   </table>
 </div>
 {% endblock %}
+
 
 {% block extra_js %}
 <script>
