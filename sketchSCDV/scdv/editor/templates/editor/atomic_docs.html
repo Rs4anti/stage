@@ -9,6 +9,12 @@
 <div class="container mt-5">
   <h2 class="mb-4">Atomic Services – Documentation</h2>
 
+  <!-- Pulsanti di navigazione -->
+  <div class="mb-3">
+    <a href="{% url 'homepage' %}" class="btn btn-outline-primary me-2">Homepage</a>
+    <a href="{% url 'openapi-docs-page' %}" class="btn btn-outline-secondary">Indietro</a>
+  </div>
+
   <table class="table table-bordered table-striped table-sm">
     <thead class="table-dark">
       <tr>
@@ -29,8 +35,7 @@
           <td>
             <a href="{{ service.schema_url }}" target="_blank" class="btn btn-sm btn-secondary">JSON</a>
             <a href="{% url 'swagger-viewer' task_id=service.task_id %}" target="_blank" class="btn btn-sm btn-primary">Swagger UI</a>
-            </td>
-
+          </td>
         </tr>
       {% endfor %}
     </tbody>
