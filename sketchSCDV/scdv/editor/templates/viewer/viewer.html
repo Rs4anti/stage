@@ -25,7 +25,6 @@
 </div>
 {% endblock %}
 
-
 {% block extra_js %}
 <script>
 async function loadDiagramList() {
@@ -35,51 +34,40 @@ async function loadDiagramList() {
   tbody.innerHTML = '';
 
   list.forEach(d => {
-  const row = document.createElement('tr');
-  const viewUrl = `/viewer/by-name/${encodeURIComponent(d.name)}/`;
+    const row = document.createElement('tr');
+    const viewUrl = `/viewer/by-name/${encodeURIComponent(d.name)}/`;
+    const editUrl = `/editor/?id=${d.id}`;
 
-row.innerHTML = `
-  <td>${d.name}</td>
-  <td class="text-center">
-    <a href="${viewUrl}" class="btn btn-sm btn-info me-2">Vedi</a>
-    <button class="btn btn-sm btn-warning me-2" onclick="window.location.href='/editor/?id=${d.id}'">Modify</button>
-      <button class="btn btn-sm btn-secondary" onclick="exportDiagram('${d.id}')">Export</button>
-  </td>
-`;
+    row.innerHTML = `
+      <td>${d.name}</td>
+      <td class="text-center">
+        <a href="${viewUrl}" class="btn btn-sm btn-info me-2">View</a>
+        <button class="btn btn-sm btn-warning me-2" onclick="window.location.href='${editUrl}'">Edit</button>
+        <button class="btn btn-sm btn-secondary" onclick="exportDiagram('${d.id}')">Download</button>
+      </td>
+    `;
 
-  tbody.appendChild(row);
-});
-
-}
-
-async function viewDiagram(id) {
-  const res = await fetch(`/viewer/api/${id}/`);
-  const data = await res.json();
-  await openDiagram(data.xml_content);
-  alert(`Visualize: ${data.name}`);
-}
-
-async function editDiagram(id) {
-  const res = await fetch(`/viewer/api/${id}/`);
-  const data = await res.json();
-  await openDiagram(data.xml_content);
-  localStorage.setItem('diagramId', data.id);
-  window.diagramId = data.id;
-  alert(`Modify: ${data.name}`);
-  // eventualmente redirect a /editor/
-  // window.location.href = '/editor/';
+    tbody.appendChild(row);
+  });
 }
 
 async function exportDiagram(id) {
-  const res = await fetch(`/viewer/api/${id}/`);
-  const data = await res.json();
-  const blob = new Blob([data.xml_content], { type: 'text/xml' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${data.name || 'diagram'}.bpmn`;
-  a.click();
-  URL.revokeObjectURL(url);
+  try {
+    const res = await fetch(`/viewer/api/${id}/`);
+    if (!res.ok) throw new Error("Export failed");
+
+    const data = await res.json();
+    const blob = new Blob([data.xml_content], { type: 'text/xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${data.name || 'diagram'}.bpmn`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    alert("❌ Impossibile esportare il diagramma.");
+    console.error(err);
+  }
 }
 
 document.addEventListener('DOMContentLoaded', loadDiagramList);
