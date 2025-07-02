@@ -6,7 +6,7 @@ from django.http import JsonResponse
 from rest_framework.decorators import api_view
 
 def openapi_docs_page(request):
-    return render(request, 'editor/openapi_docs.html')
+    return render(request, 'openapi_docs/openapi_docs.html')
 
 def atomic_docs_page(request):
     services = list(atomic_services_collection.find())
@@ -15,7 +15,7 @@ def atomic_docs_page(request):
     for s in services:
         s['schema_url'] = f"{base_url}/openapi_docs/schema/atomic/{s['task_id']}/"
 
-    return render(request, 'editor/atomic_docs.html', {'services': services})
+    return render(request, 'openapi_docs/atomic_docs.html', {'services': services})
 
 def swagger_viewer(request, task_id):
     base_url = request.build_absolute_uri('/').rstrip('/')
@@ -25,7 +25,7 @@ def swagger_viewer(request, task_id):
         schema_type = "atomic"
 
     schema_url = f"{base_url}/openapi_docs/schema/{schema_type}/{task_id}/"
-    return render(request, 'editor/swagger_viewer.html', {'schema_url': schema_url})
+    return render(request, 'openapi_docs/swagger_viewer.html', {'schema_url': schema_url})
 
 class AtomicServiceSchemaView(APIView):
     """
@@ -184,7 +184,7 @@ def cpps_docs_page(request):
     for s in services:
         s['schema_url'] = f"{base_url}/openapi_docs/schema/cpps/{s['group_id']}/"
 
-    return render(request, 'editor/cpps_docs.html', {'services': services})
+    return render(request, 'openapi_docs/cpps_docs.html', {'services': services})
 
 
 
@@ -195,7 +195,7 @@ def cppn_docs_page(request):
     for s in services:
         s['schema_url'] = f"{base_url}/openapi_docs/schema/cppn/{s['group_id']}/"
 
-    return render(request, 'editor/cppn_docs.html', {'services': services})
+    return render(request, 'openapi_docs/cppn_docs.html', {'services': services})
 
 class CPPSServiceSchemaView(APIView):
     """
