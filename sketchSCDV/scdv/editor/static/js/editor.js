@@ -22,6 +22,33 @@ const bpmnModeler = new BpmnJS({
 
 window.bpmnModeler = bpmnModeler;
 
+document.addEventListener('DOMContentLoaded', async () => {
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get('id');
+
+  if (id) {
+    try {
+      const res = await fetch(`/viewer/api/${id}/`);
+      if (!res.ok) throw new Error("Diagramma non trovato");
+
+      const data = await res.json();
+      await openDiagram(data.xml_content);
+      localStorage.setItem('diagramId', data.id);
+      window.diagramId = data.id;
+
+      console.log("✏️ Modalità modifica attivata per:", data.name);
+    } catch (err) {
+      console.error("Errore nel caricamento del diagramma:", err);
+      alert("❌ Impossibile caricare il diagramma per la modifica.");
+    }
+  } else {
+    console.log("New diagram (no id in URL)");
+    resetDiagram(); // chiamato solo in modalità creazione da zero
+  }
+});
+
+
+
 const emptyDiagram = `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                   xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
