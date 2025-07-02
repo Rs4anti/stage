@@ -13,6 +13,9 @@ urlpatterns = [
     path('api/save-cpps-service/', views.save_cpps_service, name='save_cpps_service'),
     path('api/save-cppn-service/', views.save_cppn_service, name='save_cppn_service'),
 
+    path('docs/openapidocs/', views.openapi_docs_page, name='openapi-docs-page'),
+
+
     #restituisce lo schema OpenAPI di tutti i servizi atomici disponibili.
     #È pensato per fornire una descrizione conforme a OpenAPI degli endpoint
     #REST delle atomic services (servizi per raccolta, elaborazione, visualizzazione e condivisione dati).

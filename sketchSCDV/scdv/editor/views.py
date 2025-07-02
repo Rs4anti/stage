@@ -17,6 +17,9 @@ from bson.errors import InvalidId
 def data_view_editor(request):
     return render(request, 'editor/view.html')
 
+def openapi_docs_page(request):
+    return render(request, 'editor/openapi_docs.html')
+
 
 def atomic_docs_page(request):
     services = list(atomic_services_collection.find())
