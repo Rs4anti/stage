@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Importa Supply Chain Data View{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <h2 class="mb-4 text-center">📥 Importa Supply Chain Data View</h2>
+
+  <!-- Input file -->
+  <div class="mb-4">
+    <label for="bpmnFile" class="form-label fw-bold">Scegli file:</label>
+    <input type="file" class="form-control" id="bpmnFile" accept=".bpmn,.xml">
+    <small class="text-muted">Solo file BPMN/XML compatibili.</small>
+  </div>
+
+  <!-- Canvas -->
+  <div id="canvas" style="height: 400px; border: 1px solid #ccc;"></div>
+
+  <!-- Pulsanti -->
+  <div class="mt-4 d-flex justify-content-center gap-3">
+    <button class="btn btn-success">💾 Salva nel DB</button>
+    <a href="/editor/" class="btn btn-primary">✏️ Modifica</a>
+    <button class="btn btn-danger">🗑 Elimina</button>
+  </div>
+</div>
+{% endblock %}

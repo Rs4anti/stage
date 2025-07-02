@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'editor',
     'viewer',
+    'importer',
     'rest_framework',
     'drf_spectacular',
 ]
