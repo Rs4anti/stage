@@ -13,7 +13,7 @@ function openGroupClassificationForm(element, existingData = null) {
   let gdprMap = {};
   let endpoints = [];
 
-  // 🔹 Caso 1: dati da MongoDB (API get_cppn_service o get_cpps_service)
+  //dati da MongoDB (API get_cppn_service o get_cpps_service)
   if (existingData) {
     groupType = existingData.group_type || 'CPPS';
     name = existingData.name || '';
@@ -25,7 +25,7 @@ function openGroupClassificationForm(element, existingData = null) {
     endpoints = existingData.endpoints || [];
   }
 
-  // 🔹 Caso 2: estensioni già salvate nel diagramma
+  // estensioni già salvate nel diagramma
   else if (bo.extensionElements?.values?.length) {
     const ext = bo.extensionElements.values.find(e => e.$type === 'custom:GroupExtension');
     if (ext) {
@@ -48,7 +48,7 @@ function openGroupClassificationForm(element, existingData = null) {
     }
   }
 
-  // 🔹 Caso 3: fallback automatico basato su partecipanti
+  //fallback automatico basato su partecipanti
   if (!existingData && !bo.extensionElements?.values?.length) {
     const detectedParticipants = detectGroupParticipants(element);
     groupType = detectedParticipants.length === 1 ? 'CPPS' : 'CPPN';
@@ -67,7 +67,7 @@ function openGroupClassificationForm(element, existingData = null) {
     }
   }
 
-  // 🧩 Popola i campi della modale
+  //Popola i campi della modale
   document.getElementById('groupTypeSelect').value = groupType;
   toggleCPPNFields();
   document.getElementById('workflowTypeSelect').value = workflowType || 'sequence';
@@ -79,7 +79,7 @@ function openGroupClassificationForm(element, existingData = null) {
   document.getElementById('singleActor').readOnly = true;
   document.getElementById('actorsInvolved').readOnly = true;
 
-  // 🛡️ GDPR Map
+  //GDPR Map
   const gdprContainer = document.getElementById('gdprMapContainer');
   gdprContainer.innerHTML = '';
   if (groupType === 'CPPN') {
@@ -99,7 +99,7 @@ function openGroupClassificationForm(element, existingData = null) {
     gdprNote.style.display = 'none';
   }
 
-  // 🌐 Endpoints (solo CPPS)
+  // Endpoints (solo CPPS)
   const epContainer = document.getElementById('endpointsContainer');
   epContainer.innerHTML = '';
   if (groupType === 'CPPS' && Array.isArray(endpoints)) {

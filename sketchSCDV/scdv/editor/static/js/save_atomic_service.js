@@ -1,8 +1,8 @@
 async function saveAtomicService() {
-    console.log('Funzione saveAtomicService chiamata');
+    console.log('Called function saveAtomicService.');
 
     if (!currentElement) {
-        console.log('currentElement è nullo');
+        console.log('currentElement is null');
         return;
     }
 
@@ -26,7 +26,7 @@ async function saveAtomicService() {
     if (!diagramId) {
         const { xml } = await bpmnModeler.saveXML({ format: true });
 
-        const diagramName = prompt("Prima di salvare l'atomic service, inserisci un nome per il diagramma:");
+        const diagramName = prompt("Before saving atomic service, insert a diagram's name:");
         if (!diagramName) return;
 
         const diagramResponse = await fetch('/editor/api/save-diagram/', {
@@ -91,14 +91,14 @@ async function saveAtomicService() {
         const result = await response.json();
 
         if (response.ok) {
-            console.log("✅ Atomic service salvato con successo!", result);
+            console.log("✅ Atomic service saved successfully!", result);
         } else {
-            console.error("❌ Errore salvataggio:", result);
-            alert("Errore durante il salvataggio dell'atomic service.");
+            console.error("❌ Error saving:", result);
+            alert("Error saving atomic service.");
         }
     } catch (err) {
-        console.error("❌ Errore rete/API:", err);
-        alert("Errore di comunicazione con il server.");
+        console.error("❌ Network error/api:", err);
+        alert("Comunication server error.");
     }
 
     // Chiudi il modal
@@ -118,32 +118,32 @@ async function saveAtomicService() {
 
 function validateAtomicServiceFields({ name, atomicType, inputParams, outputParams, method, url }) {
     if (name.trim() === '') {
-        alert("Il nome del servizio è obbligatorio.");
+        alert("Service's name is mandatory.");
         return false;
     }
 
     if (!atomicType.trim()) {
-        alert("Il tipo atomico è obbligatorio.");
+        alert("Type's name is mandatory.");
         return false;
     }
 
     if (inputParams.length === 0 || inputParams.every(p => p === '')) {
-        alert("Inserire almeno un parametro di input.");
+        alert("Insert at least one input parameter.");
         return false;
     }
 
     if (outputParams.length === 0 || outputParams.every(p => p === '')) {
-        alert("Inserire almeno un parametro di output.");
+        alert("Insert at least one output parameter.");
         return false;
     }
 
     if (!method.trim()) {
-        alert("Il metodo HTTP è obbligatorio.");
+        alert("HTTP method is mandatory.");
         return false;
     }
 
     if (!url.trim() || !/^\/[a-zA-Z0-9_]+$/.test(url)) {
-        alert("L'URL è obbligatorio o non valido. Deve iniziare con '/' e contenere solo lettere, numeri o underscore.");
+        alert("URL is mandatory or not valid. Must starts with '/' (only chars, number or underscores allowed)");
         return false;
     }
 

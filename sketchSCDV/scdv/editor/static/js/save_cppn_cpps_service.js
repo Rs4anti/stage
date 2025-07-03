@@ -13,7 +13,7 @@ async function saveCompositeService() {
   const actor = document.getElementById('singleActor')?.value.trim() || '';
   const actors = document.getElementById('actorsInvolved')?.value.trim() || '';
 
-  // ⬇️ GDPR Mapping dinamico
+  //GDPR Mapping dinamico
   const gdprMap = {};
   const gdprMapContainer = document.getElementById('gdprMapContainer');
   [...gdprMapContainer.children].forEach(row => {
@@ -25,7 +25,7 @@ async function saveCompositeService() {
     }
   });
 
-  // ⬇️ Endpoint dinamici (solo CPPS)
+  //Endpoint dinamici (solo CPPS)
   const endpointRows = document.querySelectorAll('#endpointsContainer > div');
   const endpoints = Array.from(endpointRows).map(row => {
     const method = row.querySelector('select')?.value || '';
@@ -63,7 +63,7 @@ async function saveCompositeService() {
     window.diagramId = result.id;
   }
 
-  // ⬇️ Prepara payload
+  //Prepara payload
   const payload = {
     diagram_id: window.diagramId,
     group_id: currentElement.id,

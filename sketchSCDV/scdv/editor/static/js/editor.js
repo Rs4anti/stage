@@ -13,8 +13,9 @@ function getCookie(name) {
   return cookieValue;
 }
 
+//registro i miei tipi personalizzati definiti in custom-moddle.js
 const bpmnModeler = new BpmnJS({
-  container: '#canvas',
+  container: '#canvas', // dove disegno
   moddleExtensions: {
     custom: customModdle
   }
@@ -29,17 +30,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (id) {
     try {
       const res = await fetch(`/viewer/api/${id}/`);
-      if (!res.ok) throw new Error("Diagramma non trovato");
+      if (!res.ok) throw new Error("Diagram not found.");
 
       const data = await res.json();
       await openDiagram(data.xml_content);
       localStorage.setItem('diagramId', data.id);
       window.diagramId = data.id;
 
-      console.log("✏️ Modalità modifica attivata per:", data.name);
+      console.log("Modalità modifica attivata per:", data.name);
     } catch (err) {
       console.error("Errore nel caricamento del diagramma:", err);
-      alert("❌ Impossibile caricare il diagramma per la modifica.");
+      alert("❌ Impossible loading diagram to edit it.");
     }
   } else {
     console.log("New diagram (no id in URL)");
@@ -67,7 +68,7 @@ async function openDiagram(xml) {
     await bpmnModeler.importXML(xml);
     bpmnModeler.get('canvas').zoom('fit-viewport');
   } catch (err) {
-    console.error('Errore apertura diagramma', err);
+    console.error('Error opening diagram', err);
   }
 }
 
@@ -86,43 +87,43 @@ async function saveDiagram() {
       xml_content: xml
     };
 
-    // 🔍 Verifica se esiste già un diagramma con quell'ID
+    //Verifica se esiste già un diagramma con quell'ID
     if (diagramId) {
       const check = await fetch(`/editor/api/save-diagram/${diagramId}/`, { method: 'GET' });
 
       if (check.ok) {
-        console.log("📂 Diagramma già esistente → PUT");
+        console.log("Diagram already exist → PUT");
         url += `${diagramId}/`;
         method = 'PUT';
       } else {
-        console.log("🆕 L'ID salvato non corrisponde a un diagramma → POST");
+        console.log("ID saved is not of any diagram → POST");
         diagramId = null;
         localStorage.removeItem('diagramId');
       }
     }
 
-    // 🧠 Se nuovo, chiedi nome e verifica univocità
+    //Se nuovo, chiedo nome e verifica univocità
     if (!diagramId) {
-      const name = prompt("Inserisci un nome per il diagramma:");
+      const name = prompt("Insert a name for the BPMN diagram:");
       if (!name) return;
 
-      // ✅ Verifica se esiste già un diagramma con questo nome
+      //Verifica se esiste già un diagramma con questo nome
       const nameCheck = await fetch(`/editor/api/check-name/?name=${encodeURIComponent(name)}`);
       if (!nameCheck.ok) {
-        alert("❌ Errore durante la verifica del nome.");
+        alert("Name checking error!");
         return;
       }
 
       const nameExists = await nameCheck.json();
       if (nameExists.exists) {
-        alert("⚠️ Esiste già un diagramma con questo nome. Scegli un altro nome.");
+        alert("⚠️ A diagram with this name already exist. Choose another name.");
         return;
       }
 
       body.name = name;
     }
 
-    // 📨 Salvataggio
+    // Salvataggio
     const response = await fetch(url, {
       method,
       headers: {
@@ -137,26 +138,23 @@ async function saveDiagram() {
     try {
       data = JSON.parse(responseText);
     } catch (parseError) {
-      console.error("❌ Errore di parsing JSON:", responseText);
-      alert("❌ Errore dal server: risposta non valida.");
+      console.error("❌ Parsing error JSON:", responseText);
+      alert("❌ Server error: not valid reply.");
       return;
     }
 
     if (response.ok) {
-      alert("✅ Diagramma salvato con successo!");
+      alert("✅ Diagram saved successfully!");
       localStorage.setItem('diagramId', data.id);
       window.diagramId = data.id;
     } else {
-      alert("⚠️ Errore nel salvataggio:\n" + JSON.stringify(data));
+      alert("⚠️ Errore saving:\n" + JSON.stringify(data));
     }
   } catch (err) {
-    console.error("❌ Errore durante il salvataggio:", err);
-    alert("❌ Errore imprevisto.");
+    console.error("❌ Error saving", err);
+    alert("❌ Error.");
   }
 }
-
-
-
 
 
 bpmnModeler.get('eventBus').on('element.click', function (e) {
@@ -167,7 +165,6 @@ bpmnModeler.get('eventBus').on('element.click', function (e) {
   }
 
   if (el && el.type === 'bpmn:Group') {
-    console.log('thats a group, lets open groups form');
     openGroupClassificationForm(el);
   }
 
@@ -221,7 +218,7 @@ async function loadDetailsFromMongo(element) {
         return;
       }
     } catch (err) {
-      console.warn(`Errore nel recupero CPPN per ${id}`, err);
+      console.warn(`Erro fetching CPPN: ${id}`, err);
     }
 
     try {
@@ -234,7 +231,7 @@ async function loadDetailsFromMongo(element) {
         return;
       }
     } catch (err) {
-      console.warn(`Errore nel recupero CPPS per ${id}`, err);
+      console.warn(`Error fetching CPPS: ${id}`, err);
     }
 
     // Nessun servizio trovato

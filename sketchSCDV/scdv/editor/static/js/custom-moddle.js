@@ -4,7 +4,7 @@ const customModdle = {
   prefix: 'custom',
   xml: {
     tagAlias: 'lowerCase'
-  },
+  }, //introduco tipi personalizzati bpmn -> AtomicExtension e GroupExtension
   types: [
     {
       name: 'AtomicExtension',
@@ -45,9 +45,9 @@ const customModdle = {
     { name: 'name', type: 'String' },
     { name: 'description', type: 'String' },
     { name: 'workflowType', type: 'String' },
-    { name: 'members', type: 'String' }, // CSV o JSON stringificato
-    { name: 'actors', type: 'String' },  // CSV o JSON stringificato
-    { name: 'gdprMap', type: 'String' }  // JSON stringificato
+    { name: 'members', type: 'String' },  // attivita componenti cpps o cppn
+    { name: 'actors', type: 'String' },  
+    { name: 'gdprMap', type: 'String' }
   ]
 } 
   ]

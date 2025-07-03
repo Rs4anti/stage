@@ -18,6 +18,7 @@ function openAtomicServiceForm(element, isNew = false) {
   let method = '';
   let url = '';
 
+  //popolo campi form se oggetto bpmn gia presente -> bo business object
   if (bo.extensionElements?.values?.length) {
     const customExt = bo.extensionElements.values.find(e => e.$type === 'custom:AtomicExtension');
     if (customExt) {
@@ -61,7 +62,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const element = elementRegistry.get(currentElement.id);
         if (element) {
           modeling.removeElements([element]);
-          showToast("Task rimosso perché non configurato.");
+          showToast("Task removed - not configured.");
         }
       }
 
