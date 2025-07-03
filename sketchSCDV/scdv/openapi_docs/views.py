@@ -155,7 +155,7 @@ def cpps_service_schema(request, group_id):
             "operationId": f"{doc.get('name', 'cpps')}_{idx}",
             "summary": doc.get("description", ""),
             "responses": {
-                "200": {
+                "200": { #QUA INSERIREI LA DESCRIPTIONPRESA DAL SERVIZIO
                     "description": "Execution success (internal CPPS orchestration)"
                 }
             },
@@ -268,11 +268,6 @@ class CPPNServiceSchemaView(APIView):
         }
 
         return Response(openapi)
-
-
-
-
-
 
 @api_view(['GET'])
 def cppn_service_schema(request, group_id):
