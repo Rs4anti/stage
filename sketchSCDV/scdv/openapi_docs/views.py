@@ -156,10 +156,9 @@ def cpps_service_schema(request, group_id):
 
         paths.setdefault(path, {})[method] = {
             "operationId": f"{doc.get('name', 'cpps')}_{idx}",
-            "summary": doc.get("description", ""),
             "responses": {
-                "200": { #QUA INSERIREI LA DESCRIPTIONPRESA DAL SERVIZIO
-                    "description": "Execution success (internal CPPS orchestration)"
+                "200": {
+                    "description": doc.get('description')
                 }
             },
             "tags": ["cpps"],
@@ -216,11 +215,10 @@ class CPPSServiceSchemaView(APIView):
 
                 paths.setdefault(path, {})[method] = {
                     "operationId": doc.get("name", "unnamed-cpps"),
-                    "summary": doc.get("description", ""),
                     "tags": ["cpps"],
                     "responses": {
                         "200": {
-                            "description": "Success"
+                            "description": doc.get('description' '')
                         }
                     },
                     "x-owner": doc.get("actor"),
