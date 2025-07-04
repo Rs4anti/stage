@@ -50,7 +50,8 @@ class AtomicServiceSchemaView(APIView):
                             "schema": {
                                 "type": "object",
                                 "properties": {p: {"type": "string"} for p in input_params},
-                                "required": input_params
+                                "required": input_params,
+                                "x-owner": doc.get("owner", "unknown")
                             }
                         }
                     }
@@ -110,6 +111,7 @@ def atomic_service_schema(request, task_id):
                                         'properties': {
                                             k: {'type': 'string'} for k in atomic.get('input_params', [])
                                         },
+                                        "x-owner": atomic.get("owner", "unknown"),
                                         'required': atomic.get('input_params', [])
                                     }
                                 }
@@ -131,7 +133,8 @@ def atomic_service_schema(request, task_id):
                             }
                         },
                         'tags': ['atomic'],
-                        'x-atomic-type': atomic.get('atomic_type', '')
+                        'x-atomic-type': atomic.get('atomic_type', ''),
+                        "x-owner": atomic.get("owner", "unknown")
                     }
                 }
             }
