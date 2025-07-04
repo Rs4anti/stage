@@ -102,7 +102,8 @@ def save_atomic_service(request):
                     'input_params': data['input_params'],
                     'output_params': data['output_params'],
                     'method': data['method'],
-                    'url': data['url']
+                    'url': data['url'],
+                    'owner' : data['owner']
                 }
             },
             upsert=True

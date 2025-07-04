@@ -9,6 +9,7 @@ async function saveAtomicService() {
     // Recupera il diagramId correttamente
     let diagramId = window.diagramId || localStorage.getItem('diagramId');
 
+    const owner = document.getElementById('serviceOwner').value;
     const name = document.getElementById('serviceName').value;
     const atomicType = document.getElementById('atomicType').value;
     const inputParams = document.getElementById('inputParams').value.split(',').map(s => s.trim());
@@ -56,7 +57,8 @@ async function saveAtomicService() {
         inputParams: inputParams.join(', '),
         outputParams: outputParams.join(', '),
         method,
-        url
+        url,
+        owner
     });
 
     const extensionElements = moddle.create('bpmn:ExtensionElements', {
@@ -84,7 +86,8 @@ async function saveAtomicService() {
                 input_params: inputParams,
                 output_params: outputParams,
                 method,
-                url
+                url,
+                owner
             })
         });
 
@@ -111,7 +114,8 @@ async function saveAtomicService() {
         input_params: inputParams,
         output_params: outputParams,
         method,
-        url
+        url,
+        owner
     };
 }
 
