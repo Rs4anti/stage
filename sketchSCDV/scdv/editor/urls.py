@@ -19,5 +19,7 @@ urlpatterns = [
     path('api/cpps_service/<str:group_id>/', views.get_cpps_service, name='get_cpps_service'),
     path('api/check-name/', views.check_diagram_name, name='check_diagram_name'),
 
+    path('api/all-services/', views.get_all_services, name='all-services'),
+
 
 ]

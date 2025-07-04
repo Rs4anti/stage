@@ -237,3 +237,16 @@ def get_atomic_service(request, task_id):
     if not service:
         return JsonResponse({'error': 'Atomic service not found'}, status=404)
     return JsonResponse(service, safe=False, json_dumps_params={'default': json_util.default})
+
+
+@api_view(['GET'])
+def get_all_services(request):
+    atomic = list(atomic_services_collection.find({}, {'_id': 0, 'name': 1}))
+    cpps = list(cpps_collection.find({}, {'_id': 0, 'name': 1}))
+    cppn = list(cppn_collection.find({}, {'_id': 0, 'name': 1}))
+
+    return Response({
+        'atomic': atomic,
+        'cpps': cpps,
+        'cppn': cppn
+    })

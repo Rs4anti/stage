@@ -24,6 +24,7 @@ const bpmnModeler = new BpmnJS({
 window.bpmnModeler = bpmnModeler;
 
 document.addEventListener('DOMContentLoaded', async () => {
+  loadAvailableServices();
   const params = new URLSearchParams(window.location.search);
   const id = params.get('id');
 
@@ -408,4 +409,99 @@ function renderCPPSDetails(section, data) {
 function renderNotFound(id) {
   const section = document.querySelector('.details-section');
   section.innerHTML = `<p class="text-muted">No service found for <code>${id}</code>.</p>`;
+}
+
+
+async function loadAvailableServices() {
+  try {
+    const res = await fetch('/editor/api/all-services/');
+    const data = await res.json();
+
+    const atomicList = document.getElementById('atomicServiceList');
+    const cppsList = document.getElementById('cppsServiceList');
+    const cppnList = document.getElementById('cppnServiceList');
+
+    // Pulisce prima
+    atomicList.innerHTML = '';
+    cppsList.innerHTML = '';
+    cppnList.innerHTML = '';
+
+    data.atomic.forEach(service => {
+      const li = document.createElement('li');
+      li.className = 'list-group-item list-group-item-action';
+      li.textContent = service.name;
+      li.onclick = () => renderDetails(service, 'Atomic');
+      atomicList.appendChild(li);
+    });
+
+    data.cpps.forEach(service => {
+      const li = document.createElement('li');
+      li.className = 'list-group-item list-group-item-action';
+      li.textContent = service.name;
+      li.onclick = () => renderDetails(service, 'CPPS');
+      cppsList.appendChild(li);
+    });
+
+    data.cppn.forEach(service => {
+      const li = document.createElement('li');
+      li.className = 'list-group-item list-group-item-action';
+      li.textContent = service.name;
+      li.onclick = () => renderDetails(service, 'CPPN');
+      cppnList.appendChild(li);
+    });
+  } catch (err) {
+    console.error('Error loading services:', err);
+  }
+}
+
+
+async function loadAvailableServices() {
+  try {
+    const res = await fetch('/editor/api/all-services/');
+    const data = await res.json();
+
+    const atomicList = document.getElementById('atomicServiceList');
+    const cppsList = document.getElementById('cppsServiceList');
+    const cppnList = document.getElementById('cppnServiceList');
+
+    // Svuota le liste
+    atomicList.innerHTML = '';
+    cppsList.innerHTML = '';
+    cppnList.innerHTML = '';
+
+    // Atomic services
+    data.atomic.forEach(service => {
+      const li = document.createElement('li');
+      li.className = 'list-group-item list-group-item-action';
+      li.textContent = service.name;
+      li.addEventListener('click', () => {
+        renderDetails(service, 'Atomic');
+      });
+      atomicList.appendChild(li);
+    });
+
+    // CPPS services
+    data.cpps.forEach(service => {
+      const li = document.createElement('li');
+      li.className = 'list-group-item list-group-item-action';
+      li.textContent = service.name;
+      li.addEventListener('click', () => {
+        renderDetails(service, 'CPPS');
+      });
+      cppsList.appendChild(li);
+    });
+
+    // CPPN services
+    data.cppn.forEach(service => {
+      const li = document.createElement('li');
+      li.className = 'list-group-item list-group-item-action';
+      li.textContent = service.name;
+      li.addEventListener('click', () => {
+        renderDetails(service, 'CPPN');
+      });
+      cppnList.appendChild(li);
+    });
+  } catch (err) {
+    console.error('Error loading services:', err);
+  }
 }
