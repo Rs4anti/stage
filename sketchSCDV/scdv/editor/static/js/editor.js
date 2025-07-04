@@ -267,8 +267,13 @@ function renderAtomicDetails(section, data) {
   wrapper.appendChild(title);
 
   const nameP = document.createElement('p');
-  nameP.innerHTML = `<strong>Name:</strong> ${data.name || '-'}`;
+  nameP.innerHTML = `<strong>Atomic service name:</strong> ${data.name || '-'}`;
   wrapper.appendChild(nameP);
+
+  const ownerP = document.createElement('p');
+  ownerP.innerHTML = `<strong>Owner:</strong> ${data.owner || '-'}`;
+  wrapper.appendChild(ownerP);
+
 
   const row = document.createElement('div');
   row.className = 'd-flex justify-content-between gap-5 flex-wrap';
