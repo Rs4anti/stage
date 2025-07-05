@@ -26,6 +26,7 @@
 {% endblock %}
 
 {% block extra_js %}
+
 <script>
   let fileContent = null;
 
@@ -41,7 +42,7 @@
   const name = prompt("Inserisci un nome per il diagramma:");
   if (!name) return;
 
-  // ⛔ Verifica se esiste già (case-insensitive)
+  // Verifica se esiste già (case-insensitive)
   const check = await fetch(`/editor/api/check-name/?name=${encodeURIComponent(name)}`);
   if (!check.ok) {
     alert("❌ Errore durante la verifica del nome.");
@@ -50,11 +51,11 @@
 
   const checkData = await check.json();
   if (checkData.exists) {
-    alert("⚠️ Esiste già un diagramma con questo nome. Scegli un altro nome.");
+    alert("A diagram with that name already exist, please enter another name.");
     return;
   }
 
-  // ✅ Procedi con l’import
+  // Procedo con l’import
   const res = await fetch('/importer/upload/', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -65,7 +66,7 @@
     const data = await res.json();
     window.location.href = `/editor/?id=${data.id}`;
   } else {
-    alert("❌ Errore durante l'import.");
+    alert("Import error.");
   }
 });
 

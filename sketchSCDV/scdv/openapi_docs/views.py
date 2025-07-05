@@ -41,7 +41,7 @@ class AtomicServiceSchemaView(APIView):
             output_params = doc.get("output_params", [])
 
             paths.setdefault(path, {})[method] = {
-                "operationId": doc.get("name", "unnamed-service"),
+                "atomic-name": doc.get("name", "unnamed-service"),
                 "summary": f"{doc.get('atomic_type')} atomic service",
                 "requestBody": {
                     "required": True,
@@ -100,7 +100,7 @@ def atomic_service_schema(request, task_id):
         'paths': {
             atomic['url']: {
                 atomic.get('method', 'POST').lower(): {
-                'operationId': atomic.get('name', task_id),
+                'atomic-name': atomic.get('name', task_id),
                     'summary': f"{atomic.get('atomic_type', 'atomic')} service",
                     'requestBody': {
                         'required': True,
