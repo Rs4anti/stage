@@ -138,35 +138,37 @@ function detectGroupMembers(groupElement) {
   const canvas = bpmnModeler.get('canvas');
   const groupBBox = canvas.getAbsoluteBBox(groupElement);
 
-   // Funzione: un elemento è dentro un bbox
-  const isInside = (inner, outer) =>
-    outer.x < inner.x + inner.width &&
-    outer.x + outer.width > inner.x &&
-    outer.y < inner.y + inner.height &&
-    outer.y + outer.height > inner.y;
+  // Funzione: inclusione stretta
+  const isStrictlyInside = (inner, outer) =>
+    inner.x >= outer.x &&
+    inner.y >= outer.y &&
+    inner.x + inner.width <= outer.x + outer.width &&
+    inner.y + inner.height <= outer.y + outer.height;
 
+  // Recupera i task
   const taskLike = elementRegistry.filter(el =>
     el.type === 'bpmn:Task' ||
     el.type === 'bpmn:SubProcess' ||
     el.type === 'bpmn:CallActivity'
   );
 
+  // Recupera i gruppi annidati
   const allGroups = elementRegistry.filter(el => el.type === 'bpmn:Group');
   const nestedCPPS = allGroups
-    .filter(el => el.id !== groupElement.id && isInside(canvas.getAbsoluteBBox(el), groupBBox));
+    .filter(el => el.id !== groupElement.id && isStrictlyInside(canvas.getAbsoluteBBox(el), groupBBox));
 
-  // Mappa bounding box dei gruppi annidati
   const nestedBBoxes = nestedCPPS.map(el => canvas.getAbsoluteBBox(el));
+
   const atomicMembers = taskLike
     .filter(el => {
       const elBBox = canvas.getAbsoluteBBox(el);
 
-      // Deve essere nel gruppo principale
-      if (!isInside(elBBox, groupBBox)) return false;
+      // Deve essere completamente dentro il group principale
+      if (!isStrictlyInside(elBBox, groupBBox)) return false;
 
-      // NON deve essere dentro un gruppo annidato
+      // NON deve essere dentro uno dei gruppi annidati
       for (const nestedBBox of nestedBBoxes) {
-        if (isInside(elBBox, nestedBBox)) return false;
+        if (isStrictlyInside(elBBox, nestedBBox)) return false;
       }
 
       return true;

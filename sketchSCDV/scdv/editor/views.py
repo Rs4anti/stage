@@ -121,7 +121,16 @@ def save_atomic_service(request):
 @api_view(['POST'])
 def save_cppn_service(request):
     data = request.data
-    required_fields = ['diagram_id', 'group_id', 'name', 'description', 'workflow_type', 'members', 'actors', 'gdpr_map']
+    required_fields = [
+        'diagram_id',
+        'group_id',
+        'name',
+        'description',
+        'workflow_type',
+        'members',
+        'actors',
+        'gdpr_map'
+    ]
 
     missing = [f for f in required_fields if f not in data]
     if missing:
@@ -144,7 +153,7 @@ def save_cppn_service(request):
 
     try:
         doc = {
-            "group_type" : "CPPN",
+            "group_type": "CPPN",
             'diagram_id': str(diagram_id),
             'group_id': data['group_id'],
             'name': data['name'],
@@ -154,6 +163,10 @@ def save_cppn_service(request):
             'actors': data['actors'],
             'gdpr_map': data['gdpr_map']
         }
+
+        # ✅ Aggiungi se presente
+        if 'nested_cpps' in data:
+            doc['nested_cpps'] = data['nested_cpps']
 
         result = cppn_collection.update_one(
             {'group_id': data['group_id']},
