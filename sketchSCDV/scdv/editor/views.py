@@ -166,46 +166,67 @@ def save_cppn_service(request):
     except Exception as e:
         return Response({'error': str(e)}, status=500)
 
-
 @api_view(['POST'])
 def save_cpps_service(request):
     data = request.data
-    required_fields = ['diagram_id', 'group_id', 'name', 'description', 'workflow_type', 'members', 'actor', 'endpoints']
+    required_fields = [
+        'diagram_id',
+        'group_id',
+        'name',
+        'description',
+        'workflow_type',
+        'members',
+        'actor',
+        'endpoints'
+    ]
 
+    # Verifica presenza dei campi obbligatori
     missing = [f for f in required_fields if f not in data]
     if missing:
         return Response({'error': f'Missing fields: {", ".join(missing)}'}, status=400)
 
-    from bson import ObjectId
+    # Valida diagram_id
     try:
         diagram_id = ObjectId(data['diagram_id'])
     except Exception:
         return Response({'error': 'Invalid diagram ID'}, status=400)
 
+    # Verifica che il diagramma esista
     diagram = bpmn_collection.find_one({'_id': diagram_id})
     if not diagram:
         return Response({'error': 'Diagram not found'}, status=404)
 
     try:
+        # Crea il documento da salvare
         doc = {
-            "group_type" : "CPPS",
-            'diagram_id': str(diagram_id),
-            'group_id': data['group_id'],
-            'name': data['name'],
-            'description': data['description'],
-            'workflow_type': data['workflow_type'],
-            'members': data['members'],
-            'actor': data['actor'],
-            'endpoints': data['endpoints']
+            "group_type": "CPPS",
+            "diagram_id": str(diagram_id),
+            "group_id": data['group_id'],
+            "name": data['name'],
+            "description": data['description'],
+            "workflow_type": data['workflow_type'],
+            "members": data['members'],
+            "actor": data['actor'],
+            "endpoints": data['endpoints']
         }
 
+        # Aggiungi i CPPS annidati se presenti
+        if 'nested_cpps' in data:
+            print(data['nested_cpps'])
+            doc['nested_cpps'] = data['nested_cpps']
+
+        # Salva nel DB
         result = cpps_collection.update_one(
             {'group_id': data['group_id']},
             {'$set': doc},
             upsert=True
         )
 
-        return Response({'status': 'ok', 'created': result.upserted_id is not None})
+        return Response({
+            'status': 'ok',
+            'created': result.upserted_id is not None
+        })
+
     except Exception as e:
         return Response({'error': str(e)}, status=500)
 

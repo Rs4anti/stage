@@ -33,8 +33,9 @@ async function saveCompositeService() {
     return { method, url };
   });
 
-  const members = detectGroupMembers(currentElement);
-  console.log("Group members:", members);
+  const {atomicMembers, nestedCPPS} = detectGroupMembers(currentElement);
+  console.log("Atomic members:", atomicMembers);
+  console.log("Nested cpps:", nestedCPPS);
 
   if (!name) {
     alert("Composite service's name is mandatory!");
@@ -70,7 +71,8 @@ async function saveCompositeService() {
     name,
     description,
     workflow_type: workflowType,
-    members
+    members: atomicMembers,
+    nested_cpps : nestedCPPS,
   };
 
   try {
@@ -136,21 +138,43 @@ function detectGroupMembers(groupElement) {
   const canvas = bpmnModeler.get('canvas');
   const groupBBox = canvas.getAbsoluteBBox(groupElement);
 
+   // Funzione: un elemento è dentro un bbox
+  const isInside = (inner, outer) =>
+    outer.x < inner.x + inner.width &&
+    outer.x + outer.width > inner.x &&
+    outer.y < inner.y + inner.height &&
+    outer.y + outer.height > inner.y;
+
   const taskLike = elementRegistry.filter(el =>
     el.type === 'bpmn:Task' ||
     el.type === 'bpmn:SubProcess' ||
     el.type === 'bpmn:CallActivity'
   );
 
-  return taskLike
+  const allGroups = elementRegistry.filter(el => el.type === 'bpmn:Group');
+  const nestedCPPS = allGroups
+    .filter(el => el.id !== groupElement.id && isInside(canvas.getAbsoluteBBox(el), groupBBox));
+
+  // Mappa bounding box dei gruppi annidati
+  const nestedBBoxes = nestedCPPS.map(el => canvas.getAbsoluteBBox(el));
+  const atomicMembers = taskLike
     .filter(el => {
       const elBBox = canvas.getAbsoluteBBox(el);
-      return (
-        groupBBox.x < elBBox.x + elBBox.width &&
-        groupBBox.x + groupBBox.width > elBBox.x &&
-        groupBBox.y < elBBox.y + elBBox.height &&
-        groupBBox.y + groupBBox.height > elBBox.y
-      );
+
+      // Deve essere nel gruppo principale
+      if (!isInside(elBBox, groupBBox)) return false;
+
+      // NON deve essere dentro un gruppo annidato
+      for (const nestedBBox of nestedBBoxes) {
+        if (isInside(elBBox, nestedBBox)) return false;
+      }
+
+      return true;
     })
     .map(el => el.id);
+
+  return {
+    atomicMembers,
+    nestedCPPS: nestedCPPS.map(el => el.id)
+  };
 }
