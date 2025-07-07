@@ -149,7 +149,7 @@ def cpps_service_schema(request, group_id):
     if not doc:
         return JsonResponse({'error': 'CPPS not found'}, status=404)
 
-    members = doc.get("members", [])
+    members = doc.get("atomic_services", [])
     servicenames = []
     servicetypes = []
 
@@ -286,7 +286,7 @@ class CPPNServiceSchemaView(APIView):
                 "description": doc.get("description", ""),
                 "x-actors": doc.get("actors", []),
                 "x-gdpr-map": doc.get("gdpr_map", {}),
-                "x-members": doc.get("members", []),
+                "x-members": doc.get("atomic_services", []),
                 "x-workflow": doc.get("workflow_type", "sequence")
             })
 
