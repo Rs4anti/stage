@@ -149,33 +149,40 @@ def cpps_service_schema(request, group_id):
     if not doc:
         return JsonResponse({'error': 'CPPS not found'}, status=404)
 
+    members = doc.get("members", [])
+
+    # Recupera i servizi atomici dal DB usando gli activity_id
+    atomic_services = list(atomic_services_collection.find({"task_id": {"$in": members}}))
+    atomic_names = [a.get("name", a.get("task_id")) for a in atomic_services]
+
     paths = {}
     for idx, ep in enumerate(doc.get("endpoints", [])):
         path = ep.get("url")
         method = ep.get("method", "POST").lower()
 
         paths.setdefault(path, {})[method] = {
-            "operationId": f"{doc.get('name', 'cpps')}_{idx}",
+            "operationId": f"{doc.get('name', 'cpps')}_{idx}", #evito conflitti se ho piu endpoint -> tolgo e   TODO: VALIDAZIONE JS lato client
+            "summary": doc.get("description", "CPPS composite service"),
             "responses": {
                 "200": {
-                    "description": doc.get('description')
+                    "description": doc.get('description', "Execution successful")
                 }
             },
-            "tags": ["cpps"],
-            "x-owner": doc.get("actor"),
-            "x-members": doc.get("members", []),
-            "x-workflow": doc.get("workflow_type", "sequence")
+            "tags": doc.get("group_type"),
         }
 
     schema = {
         "openapi": "3.1.0",
         "info": {
             "title": f"CPPS Service: {doc.get('name', group_id)}",
-            "version": "1.0.0"
+            "version": "1.0.0",
+            "description": doc.get('description'),
+            "x-owner": doc.get("actor"),
+            "x-atomicservices": atomic_names,
+            #"x-workflow": doc.get("workflow_type", "sequence")
         },
         "paths": paths
     }
-
     return JsonResponse(schema)
 
 
@@ -215,10 +222,10 @@ class CPPSServiceSchemaView(APIView):
 
                 paths.setdefault(path, {})[method] = {
                     "operationId": doc.get("name", "unnamed-cpps"),
-                    "tags": ["cpps"],
+                    "tags": doc.get("group_type"),
                     "responses": {
                         "200": {
-                            "description": doc.get('description' '')
+                            "description": doc.get('description', '')
                         }
                     },
                     "x-owner": doc.get("actor"),
@@ -230,7 +237,8 @@ class CPPSServiceSchemaView(APIView):
             "openapi": "3.1.0",
             "info": {
                 "title": "CPPS Services API",
-                "version": "1.0.0"
+                "version": "1.0.0",
+                "description": doc.get('description', '')
             },
             "paths": paths
         }
@@ -264,7 +272,7 @@ class CPPNServiceSchemaView(APIView):
                 "title": "CPPN Services API",
                 "version": "1.0.0"
             },
-            "paths": {},  # Nessun path diretto
+            #"paths": {},  # Nessun path diretto
             "x-cppn-services": components
         }
 
@@ -282,7 +290,8 @@ def cppn_service_schema(request, group_id):
             "title": f"CPPN Service: {doc.get('name', group_id)}",
             "version": "1.0.0"
         },
-        "paths": {},  # Nessun endpoint diretto
+        #"paths": {},  # Nessun endpoint diretto
+        "tags" : doc.get("group_type"),
         "x-actors": doc.get("actors", []),
         "x-members": doc.get("members", []),
         "x-gdpr-map": doc.get("gdpr_map", {}),
