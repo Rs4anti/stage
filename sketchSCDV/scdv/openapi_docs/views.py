@@ -150,25 +150,46 @@ def cpps_service_schema(request, group_id):
         return JsonResponse({'error': 'CPPS not found'}, status=404)
 
     members = doc.get("members", [])
+    servicenames = []
+    servicetypes = []
 
-    # Recupera i servizi atomici dal DB usando gli activity_id
-    atomic_services = list(atomic_services_collection.find({"task_id": {"$in": members}}))
-    atomic_names = [a.get("name", a.get("task_id")) for a in atomic_services]
+    # Caching per evitare query duplicate
+    atomic_map = {
+        a["task_id"]: a.get("name", a["task_id"])
+        for a in atomic_services_collection.find({"task_id": {"$in": members}})
+    }
 
+    cpps_map = {
+        c["group_id"]: c.get("name", c["group_id"])
+        for c in cpps_collection.find({"group_id": {"$in": members}})
+    }
+
+    for aid in members:
+        if aid in atomic_map:
+            servicenames.append(atomic_map[aid])
+            servicetypes.append("atomic")
+        elif aid in cpps_map:
+            servicenames.append(cpps_map[aid])
+            servicetypes.append("cpps")
+        else:
+            servicenames.append(f"[unknown:{aid}]")
+            servicetypes.append("unknown")
+
+    # costruzione paths
     paths = {}
     for idx, ep in enumerate(doc.get("endpoints", [])):
         path = ep.get("url")
         method = ep.get("method", "POST").lower()
 
         paths.setdefault(path, {})[method] = {
-            "operationId": f"{doc.get('name', 'cpps')}_{idx}", #evito conflitti se ho piu endpoint -> tolgo e   TODO: VALIDAZIONE JS lato client
+            "operationId": f"{doc.get('name', 'cpps')}_{idx}",
             "summary": doc.get("description", "CPPS composite service"),
             "responses": {
                 "200": {
                     "description": doc.get('description', "Execution successful")
                 }
             },
-            "tags": doc.get("group_type"),
+            "tags": [doc.get("group_type", "CPPS")]
         }
 
     schema = {
@@ -178,11 +199,14 @@ def cpps_service_schema(request, group_id):
             "version": "1.0.0",
             "description": doc.get('description'),
             "x-owner": doc.get("actor"),
-            "x-atomicservices": atomic_names,
-            #"x-workflow": doc.get("workflow_type", "sequence")
+            "x-services": members,
+            "x-servicenames": servicenames,
+            "x-servicetypes": servicetypes,
+            "x-workflow": doc.get("workflow_type", "sequence")
         },
         "paths": paths
     }
+
     return JsonResponse(schema)
 
 
@@ -284,18 +308,44 @@ def cppn_service_schema(request, group_id):
     if not doc:
         return JsonResponse({'error': 'CPPN not found'}, status=404)
 
+    activity_ids = doc.get("members", [])  # meglio usare "services", non "x-services"
+
+    print(activity_ids)
+
+    servicenames = []
+    servicetypes = []
+
+    for aid in activity_ids:
+        atomic = atomic_services_collection.find_one({'task_id': aid})
+        if atomic:
+            servicenames.append(atomic.get("name", aid))
+            servicetypes.append("atomic")
+            continue  # trovato, vado avanti
+
+        cpps = cpps_collection.find_one({'group_id': aid})
+        if cpps:
+            servicenames.append(cpps.get("name", aid))
+            servicetypes.append("cpps")
+            continue
+
+        # fallback: non trovato
+        servicenames.append(f"[unknown:{aid}]")
+
+    # schema finale
     schema = {
         "openapi": "3.1.0",
         "info": {
             "title": f"CPPN Service: {doc.get('name', group_id)}",
-            "version": "1.0.0"
+            "version": "1.0.0",
+            "description": doc.get("description", ""),
+            "x-actors": doc.get("actors", []),
+            "x-servicenames": servicenames,             #nuovi nomi leggibili
+            "x-services": activity_ids,                 # ID grezzi come ora
+            "x-servicetypes" : servicetypes,                 
+            "x-gdpr-map": doc.get("gdpr_map", {}),
+            "x-workflow": doc.get("workflow_type", "sequence")
         },
-        #"paths": {},  # Nessun endpoint diretto
-        "tags" : doc.get("group_type"),
-        "x-actors": doc.get("actors", []),
-        "x-members": doc.get("members", []),
-        "x-gdpr-map": doc.get("gdpr_map", {}),
-        "x-workflow": doc.get("workflow_type", "sequence")
+        "tags": ["CPPN"]
     }
 
     return JsonResponse(schema)
