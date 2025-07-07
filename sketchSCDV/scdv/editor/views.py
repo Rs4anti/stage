@@ -205,17 +205,17 @@ def save_cpps_service(request):
             "name": data['name'],
             "description": data['description'],
             "workflow_type": data['workflow_type'],
-            "members": data['members'],
+            "atomic_services": data['members'],
             "actor": data['actor'],
             "endpoints": data['endpoints']
         }
 
-        # Aggiungi i CPPS annidati se presenti
+        # Aggiungo i CPPS annidati se presenti
         if 'nested_cpps' in data:
             print(data['nested_cpps'])
             doc['nested_cpps'] = data['nested_cpps']
 
-        # Salva nel DB
+        # Salvo nel DB
         result = cpps_collection.update_one(
             {'group_id': data['group_id']},
             {'$set': doc},
