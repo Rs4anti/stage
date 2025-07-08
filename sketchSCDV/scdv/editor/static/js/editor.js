@@ -13,12 +13,17 @@ function getCookie(name) {
   return cookieValue;
 }
 
+import CustomContextPadProvider from './CustomContextPadProvider.js';
+
 //registro i miei tipi personalizzati definiti in custom-moddle.js
 const bpmnModeler = new BpmnJS({
-  container: '#canvas', // dove disegno
+  container: '#canvas',
   moddleExtensions: {
     custom: customModdle
-  }
+  },
+  additionalModules: [
+    CustomContextPadProvider
+  ]
 });
 
 window.bpmnModeler = bpmnModeler;
@@ -447,58 +452,6 @@ async function loadAvailableServices() {
       li.className = 'list-group-item list-group-item-action';
       li.textContent = service.name;
       li.onclick = () => renderDetails(service, 'CPPN');
-      cppnList.appendChild(li);
-    });
-  } catch (err) {
-    console.error('Error loading services:', err);
-  }
-}
-
-
-async function loadAvailableServices() {
-  try {
-    const res = await fetch('/editor/api/all-services/');
-    const data = await res.json();
-
-    const atomicList = document.getElementById('atomicServiceList');
-    const cppsList = document.getElementById('cppsServiceList');
-    const cppnList = document.getElementById('cppnServiceList');
-
-    // Svuota le liste
-    atomicList.innerHTML = '';
-    cppsList.innerHTML = '';
-    cppnList.innerHTML = '';
-
-    // Atomic services
-    data.atomic.forEach(service => {
-      const li = document.createElement('li');
-      li.className = 'list-group-item list-group-item-action';
-      li.textContent = service.name;
-      li.addEventListener('click', () => {
-        renderDetails(service, 'Atomic');
-      });
-      atomicList.appendChild(li);
-    });
-
-    // CPPS services
-    data.cpps.forEach(service => {
-      const li = document.createElement('li');
-      li.className = 'list-group-item list-group-item-action';
-      li.textContent = service.name;
-      li.addEventListener('click', () => {
-        renderDetails(service, 'CPPS');
-      });
-      cppsList.appendChild(li);
-    });
-
-    // CPPN services
-    data.cppn.forEach(service => {
-      const li = document.createElement('li');
-      li.className = 'list-group-item list-group-item-action';
-      li.textContent = service.name;
-      li.addEventListener('click', () => {
-        renderDetails(service, 'CPPN');
-      });
       cppnList.appendChild(li);
     });
   } catch (err) {

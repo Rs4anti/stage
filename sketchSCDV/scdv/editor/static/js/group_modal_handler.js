@@ -107,8 +107,27 @@ function openGroupClassificationForm(element, existingData = null) {
   }
 
   // Mostra la modale
-  const modal = new bootstrap.Modal(document.getElementById('groupTypeModal'));
-  modal.show();
+  const modalEl = document.getElementById('groupTypeModal');
+
+// Recupera l'istanza esistente se presente
+let modalInstance = bootstrap.Modal.getInstance(modalEl);
+
+// Se non esiste ancora, la crea e imposta listener una sola volta
+if (!modalInstance) {
+  modalInstance = new bootstrap.Modal(modalEl);
+
+  // Aggiunge una sola volta il listener di "cleanup"
+  modalEl.addEventListener('hidden.bs.modal', function () {
+    // Rimuove eventuale overlay rimasto
+    document.querySelector('.modal-backdrop')?.remove();
+    // Rimuove la classe che blocca l'interazione
+    document.body.classList.remove('modal-open');
+    // Reset dei campi eventualmente necessario (opzionale)
+  });
+}
+
+modalInstance.show();
+
 }
 
 

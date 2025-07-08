@@ -284,3 +284,57 @@ def get_all_services(request):
         'cpps': cpps,
         'cppn': cppn
     })
+
+
+
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+from bson.objectid import ObjectId
+
+@api_view(['DELETE'])
+def delete_group(request, group_id):
+    deleted = False
+
+    # Elimina il gruppo principale
+    if cpps_collection.find_one({'group_id': group_id}):
+        cpps_collection.find_one_and_delete({'group_id': group_id})
+        deleted = True
+
+    elif cppn_collection.find_one({'group_id': group_id}):
+        cppn_collection.find_one_and_delete({'group_id': group_id})
+        deleted = True
+
+    # Aggiorna tutti i documenti che lo referenziano in nested_cpps
+    result = cpps_collection.update_many(
+        { 'nested_cpps': group_id },
+        { '$pull': { 'nested_cpps': group_id } }
+    )
+
+    if deleted:
+        return Response({
+            'message': f'Gruppo {group_id} eliminato con successo',
+            'nested_cpps_removed_from': result.modified_count
+        }, status=status.HTTP_200_OK)
+
+    return Response({
+        'error': f'Gruppo {group_id} non trovato',
+        'nested_cpps_removed_from': result.modified_count
+    }, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['POST'])
+def add_nested_cpps(request, group_id):
+    nested_id = request.data.get('nested_id')
+    if not nested_id:
+        return Response({'error': 'Missing nested_id'}, status=400)
+
+    result = cpps_collection.update_one(
+        {'group_id': group_id},
+        {'$addToSet': {'nested_cpps': nested_id}}
+    )
+
+    if result.matched_count == 0:
+        return Response({'error': 'Parent CPPS not found'}, status=404)
+
+    return Response({'status': 'nested_cpps updated'})

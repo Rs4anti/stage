@@ -20,6 +20,9 @@ urlpatterns = [
     path('api/check-name/', views.check_diagram_name, name='check_diagram_name'),
 
     path('api/all-services/', views.get_all_services, name='all-services'),
+    path('api/delete_group/<str:group_id>/', views.delete_group, name='delete_group'),
+    path('api/add-nested-cpps/<str:group_id>/', views.add_nested_cpps),
+
 
 
 ]

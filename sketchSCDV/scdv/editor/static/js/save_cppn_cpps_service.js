@@ -96,8 +96,54 @@ async function saveCompositeService() {
     alert(`Error saving ${groupType}: ${err.message}`);
   }
 
+    // ✅ Se sto salvando un CPPS, verifico se è annidato in un altro CPPS
+  if (groupType === 'CPPS') {
+    const parentGroup = findParentGroup(currentElement);
+    if (parentGroup) {
+      console.log("↪️ Il gruppo è annidato dentro:", parentGroup.id);
+
+      const csrftoken = getCookie('csrftoken');
+
+      try {
+        const res = await fetch(`/editor/api/add-nested-cpps/${parentGroup.id}/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrftoken
+          },
+          body: JSON.stringify({ nested_id: currentElement.id })
+        });
+
+        const resJson = await res.json();
+        if (res.ok) {
+          console.log("✅ nested_cpps aggiornato per", parentGroup.id);
+        } else {
+          console.warn("❌ Errore aggiornamento nested_cpps:", resJson.error);
+        }
+      } catch (err) {
+        console.error("❌ Errore fetch nested_cpps:", err.message);
+      }
+    }
+  }
+
   bootstrap.Modal.getInstance(document.getElementById('groupTypeModal')).hide();
 }
+
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+      const trimmed = cookie.trim();
+      if (trimmed.startsWith(name + '=')) {
+        cookieValue = decodeURIComponent(trimmed.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+
 
 async function saveCPPNService(payload) {
   const csrftoken = getCookie('csrftoken');
@@ -180,3 +226,25 @@ function detectGroupMembers(groupElement) {
     nestedCPPS: nestedCPPS.map(el => el.id)
   };
 }
+
+
+function findParentGroup(innerGroup) {
+  const elementRegistry = bpmnModeler.get('elementRegistry');
+  const canvas = bpmnModeler.get('canvas');
+  const innerBBox = canvas.getAbsoluteBBox(innerGroup);
+
+  const groups = elementRegistry.filter(el =>
+    el.type === 'bpmn:Group' && el.id !== innerGroup.id
+  );
+
+  return groups.find(g => {
+    const outerBBox = canvas.getAbsoluteBBox(g);
+    return (
+      innerBBox.x >= outerBBox.x &&
+      innerBBox.y >= outerBBox.y &&
+      innerBBox.x + innerBBox.width <= outerBBox.x + outerBBox.width &&
+      innerBBox.y + innerBBox.height <= outerBBox.y + outerBBox.height
+    );
+  });
+}
+
