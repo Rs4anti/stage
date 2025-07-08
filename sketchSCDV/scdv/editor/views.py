@@ -338,3 +338,35 @@ def add_nested_cpps(request, group_id):
         return Response({'error': 'Parent CPPS not found'}, status=404)
 
     return Response({'status': 'nested_cpps updated'})
+
+
+@api_view(['DELETE'])
+def delete_atomic(request, atomic_id):
+    try:
+
+        # Elimino atomic
+        deleted = atomic_services_collection.find_one_and_delete({'task_id': atomic_id})
+        if not deleted:
+            return Response({'error': 'Atomic service not found'}, status=404)
+
+        # Rimuovo atomic dai CPPS
+        cpps_result = cpps_collection.update_many(
+            {'atomic_services': atomic_id},
+            {'$pull': {'atomic_services': atomic_id}}
+        )
+
+        # Rimuovo atomic dai CPPN
+        cppn_result = cppn_collection.update_many(
+            {'atomic_services': atomic_id},
+            {'$pull': {'atomic_services': atomic_id}}
+        )
+
+        return Response({
+            'status': 'deleted',
+            'removed_from_cpps': cpps_result.modified_count,
+            'removed_from_cppn': cppn_result.modified_count
+        }, status=200)
+
+    except Exception as e:
+        print(f"❌ Errore durante l'eliminazione dell'atomic: {e}")
+        return Response({'error': str(e)}, status=500)

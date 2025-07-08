@@ -9,42 +9,51 @@ function CustomContextPadProvider(
   contextPad.registerProvider(this);
 
   this.getContextPadEntries = function (element) {
-    const actions = {};
+  const actions = {};
 
-    if (element.type === 'bpmn:Group') {
-      actions['delete'] = {
-        group: 'edit',
-        className: 'bpmn-icon-trash',
-        title: translate('Delete group and metadata'),
-        action: {
-          click: function () {
-            console.log('[CustomContextPad] Cestino cliccato per', element.id);
-
-            if (confirm(`Eliminare il gruppo ${element.id}?`)) {
-              modeling.removeElements([element]);
-
-              fetch(`/editor/api/delete_group/${element.id}/`, {
-                method: 'DELETE',
-                headers: {
-                  'X-CSRFToken': getCookie('csrftoken')
-                }
-              }).then(res => {
-                if (res.ok) {
-                  alert('✅ Gruppo eliminato');
-                } else {
-                  alert('❌ Errore eliminazione lato server');
-                }
-              }).catch(err => {
-                alert('❌ Errore fetch: ' + err.message);
-              });
-            }
+  // ✅ Gestione cancellazione CPPS o CPPN (gruppi)
+  if (element.type === 'bpmn:Group') {
+    actions['delete'] = {
+      group: 'edit',
+      className: 'bpmn-icon-trash',
+      title: translate('Delete group and metadata'),
+      action: {
+        click: function () {
+          if (confirm(`Eliminare il gruppo ${element.id}?`)) {
+            modeling.removeElements([element]);
+            fetch(`/editor/api/delete_cppn_cpps/${element.id}`, {
+              method: 'DELETE',
+              headers: { 'X-CSRFToken': getCookie('csrftoken') }
+            });
           }
         }
-      };
-    }
+      }
+    };
+  }
 
-    return actions;
-  };
+  // ✅ Gestione cancellazione atomic task
+  if (element.type === 'bpmn:Task') {
+    actions['delete'] = {
+      group: 'edit',
+      className: 'bpmn-icon-trash',
+      title: translate('Delete atomic service'),
+      action: {
+        click: function () {
+          if (confirm(`Eliminare il servizio atomico ${element.id}?`)) {
+            modeling.removeElements([element]);
+            fetch(`/editor/api/delete-atomic/${element.id}/`, {
+              method: 'DELETE',
+              headers: { 'X-CSRFToken': getCookie('csrftoken') }
+            });
+          }
+        }
+      }
+    };
+  }
+
+  return actions;
+};
+
 }
 
 CustomContextPadProvider.$inject = [
