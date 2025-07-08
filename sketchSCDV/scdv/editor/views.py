@@ -159,12 +159,12 @@ def save_cppn_service(request):
             'name': data['name'],
             'description': data['description'],
             'workflow_type': data['workflow_type'],
-            'members': data['members'],
             'actors': data['actors'],
-            'gdpr_map': data['gdpr_map']
+            'gdpr_map': data['gdpr_map'],
+            'atomic_services': data['members'],
         }
 
-        # ✅ Aggiungi se presente
+        # Aggiungo cpps se presenti
         if 'nested_cpps' in data:
             doc['nested_cpps'] = data['nested_cpps']
 
