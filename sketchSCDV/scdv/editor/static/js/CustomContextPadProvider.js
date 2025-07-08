@@ -21,7 +21,7 @@ function CustomContextPadProvider(
         click: function () {
           if (confirm(`Eliminare il gruppo ${element.id}?`)) {
             modeling.removeElements([element]);
-            fetch(`/editor/api/delete_cppn_cpps/${element.id}`, {
+            fetch(`/editor/api/delete_group/${element.id}/`, {
               method: 'DELETE',
               headers: { 'X-CSRFToken': getCookie('csrftoken') }
             });

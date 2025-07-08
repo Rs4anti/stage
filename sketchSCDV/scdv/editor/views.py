@@ -296,17 +296,24 @@ from bson.objectid import ObjectId
 def delete_group(request, group_id):
     deleted = False
 
-    # Elimina il gruppo principale
+    # 🔍 Prova a cancellare dalla collezione CPPS
     if cpps_collection.find_one({'group_id': group_id}):
         cpps_collection.find_one_and_delete({'group_id': group_id})
         deleted = True
 
+    # 🔍 Prova a cancellare dalla collezione CPPN
     elif cppn_collection.find_one({'group_id': group_id}):
         cppn_collection.find_one_and_delete({'group_id': group_id})
         deleted = True
 
-    # Aggiorna tutti i documenti che lo referenziano in nested_cpps
-    result = cpps_collection.update_many(
+    # 🔁 Rimuove il group_id da nested_cpps in altri CPPS
+    removed_from_cpps = cpps_collection.update_many(
+        { 'nested_cpps': group_id },
+        { '$pull': { 'nested_cpps': group_id } }
+    )
+
+    # 🔁 Rimuove il group_id da nested_cpps in CPPN
+    removed_from_cppn = cppn_collection.update_many(
         { 'nested_cpps': group_id },
         { '$pull': { 'nested_cpps': group_id } }
     )
@@ -314,13 +321,16 @@ def delete_group(request, group_id):
     if deleted:
         return Response({
             'message': f'Gruppo {group_id} eliminato con successo',
-            'nested_cpps_removed_from': result.modified_count
+            'removed_from_nested_cpps': removed_from_cpps.modified_count,
+            'removed_from_nested_cppn': removed_from_cppn.modified_count
         }, status=status.HTTP_200_OK)
 
     return Response({
         'error': f'Gruppo {group_id} non trovato',
-        'nested_cpps_removed_from': result.modified_count
+        'removed_from_nested_cpps': removed_from_cpps.modified_count,
+        'removed_from_nested_cppn': removed_from_cppn.modified_count
     }, status=status.HTTP_404_NOT_FOUND)
+
 
 
 @api_view(['POST'])
