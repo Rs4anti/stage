@@ -3,65 +3,82 @@ export default {
   customContextPad: ['type', CustomContextPadProvider]
 };
 
-function CustomContextPadProvider(
-  config, contextPad, modeling, translate
-) {
+function CustomContextPadProvider(config, contextPad, modeling, translate) {
   contextPad.registerProvider(this);
 
+  let itemToDelete = null;
+  let itemTypeToDelete = '';
+
+  // Collega listener al bottone "Elimina" solo quando DOM pronto
+  window.addEventListener('DOMContentLoaded', () => {
+    const confirmBtn = document.getElementById('confirmDeleteItemBtn');
+    const modalEl = document.getElementById('deleteItemModal');
+
+    if (confirmBtn && modalEl) {
+      confirmBtn.addEventListener('click', function () {
+        if (!itemToDelete) return;
+
+        modeling.removeElements([itemToDelete]);
+
+        let url = '';
+        if (itemTypeToDelete === 'group') {
+          url = `/editor/api/delete_group/${itemToDelete.id}/`;
+        } else if (itemTypeToDelete === 'atomic') {
+          url = `/editor/api/delete-atomic/${itemToDelete.id}/`;
+        }
+
+        fetch(url, {
+          method: 'DELETE',
+          headers: { 'X-CSRFToken': getCookie('csrftoken') }
+        }).then(response => {
+          if (!response.ok) {
+            console.error(`Errore eliminazione ${itemTypeToDelete} ${itemToDelete.id}`);
+          }
+        }).catch(error => {
+          console.error('Errore di rete:', error);
+        });
+
+        bootstrap.Modal.getInstance(modalEl).hide();
+        itemToDelete = null;
+        itemTypeToDelete = '';
+      });
+    }
+  });
+
   this.getContextPadEntries = function (element) {
-  const actions = {};
+    const actions = {};
 
-  // Gestione cancellazione CPPS o CPPN (gruppi)
-  if (element.type === 'bpmn:Group') {
     actions['delete'] = {
       group: 'edit',
       className: 'bpmn-icon-trash',
-      title: translate('Delete group and metadata'),
+      title: element.type === 'bpmn:Group' ? translate('Delete group and metadata') : translate('Delete atomic service'),
       action: {
         click: function () {
-          if (confirm(`Eliminare il gruppo ${element.id}?`)) {
-            modeling.removeElements([element]);
-            fetch(`/editor/api/delete_group/${element.id}/`, {
-              method: 'DELETE',
-              headers: { 'X-CSRFToken': getCookie('csrftoken') }
-            });
+          const typeEl = document.getElementById('deleteItemType');
+          const idEl = document.getElementById('deleteItemId');
+          const modalEl = document.getElementById('deleteItemModal');
+
+          if (!typeEl || !idEl || !modalEl) {
+            console.warn('Modale non trovata nel DOM');
+            return;
           }
+
+          itemToDelete = element;
+          itemTypeToDelete = element.type === 'bpmn:Group' ? 'group' : 'atomic';
+
+          typeEl.innerText = itemTypeToDelete === 'group' ? 'gruppo' : 'servizio atomico';
+          idEl.innerText = element.id;
+
+          new bootstrap.Modal(modalEl).show();
         }
       }
     };
-  }
 
-  // Gestione cancellazione atomic task
-  if (element.type === 'bpmn:Task') {
-    actions['delete'] = {
-      group: 'edit',
-      className: 'bpmn-icon-trash',
-      title: translate('Delete atomic service'),
-      action: {
-        click: function () {
-          if (confirm(`Eliminare il servizio atomico ${element.id}?`)) {
-            modeling.removeElements([element]);
-            fetch(`/editor/api/delete-atomic/${element.id}/`, {
-              method: 'DELETE',
-              headers: { 'X-CSRFToken': getCookie('csrftoken') }
-            });
-          }
-        }
-      }
-    };
-  }
-
-  return actions;
-};
-
+    return actions;
+  };
 }
 
-CustomContextPadProvider.$inject = [
-  'config',
-  'contextPad',
-  'modeling',
-  'translate'
-];
+CustomContextPadProvider.$inject = ['config', 'contextPad', 'modeling', 'translate'];
 
 function getCookie(name) {
   let cookieValue = null;
