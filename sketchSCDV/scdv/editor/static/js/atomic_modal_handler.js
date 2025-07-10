@@ -18,7 +18,7 @@ function openAtomicServiceForm(element, isNew = false) {
   let method = '';
   let url = '';
 
-  //popolo campi form se oggetto bpmn gia presente -> bo business object
+  //popolo campi form se oggetto bpmn gia presente -> bo = business object
   if (bo.extensionElements?.values?.length) {
     const customExt = bo.extensionElements.values.find(e => e.$type === 'custom:AtomicExtension');
     if (customExt) {

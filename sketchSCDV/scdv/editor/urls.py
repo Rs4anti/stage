@@ -13,8 +13,6 @@ urlpatterns = [
     path('api/save-cpps-service/', views.save_cpps_service, name='save_cpps_service'),
     path('api/save-cppn-service/', views.save_cppn_service, name='save_cppn_service'),
 
-
-
     path('api/cppn_service/<str:group_id>/', views.get_cppn_service, name='get_cppn_service'),
     path('api/cpps_service/<str:group_id>/', views.get_cpps_service, name='get_cpps_service'),
     path('api/check-name/', views.check_diagram_name, name='check_diagram_name'),
@@ -23,8 +21,4 @@ urlpatterns = [
     path('api/delete_group/<str:group_id>/', views.delete_group, name='delete_group'),
     path('api/add-nested-cpps/<str:group_id>/', views.add_nested_cpps),
     path('api/delete-atomic/<str:atomic_id>/', views.delete_atomic),
-
-
-
-
 ]

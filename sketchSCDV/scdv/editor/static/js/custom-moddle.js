@@ -37,6 +37,7 @@ const customModdle = {
         }
       ]
     },
+    // CPPS/CPPN
     {
   name: 'GroupExtension',
   superClass: ['Element'],

@@ -97,12 +97,12 @@ def atomic_service_schema(request, task_id):
             'title': f"Atomic Service: {atomic.get('name', task_id)}",
             'version': '1.0.0',
             'x-atomic-type': atomic.get('atomic_type', ''),
-            "x-owner": atomic.get("owner", "unknown")
+            "x-owner": atomic.get("owner", "unknown"),
+            'x-atomic-name': atomic.get('name', task_id),
         },
         'paths': {
             atomic['url']: {
                 atomic.get('method', 'POST').lower(): {
-                'atomic-name': atomic.get('name', task_id),
                     'summary': f"{atomic.get('atomic_type', 'atomic')} service",
                     'requestBody': {
                         'required': True,
@@ -164,7 +164,7 @@ def cppn_docs_page(request):
 
 class CPPSServiceSchemaView(APIView):
     """
-    Dynamic OpenAPI 3.1 schema for CPPS services stored in MongoDB.
+    Dynamic OpenAPI 3.1 with drf, schema for CPPS services stored in MongoDB.
     """
 
     def get(self, request):
@@ -255,6 +255,7 @@ def cpps_service_schema(request, group_id):
             "version": "1.0.0",
             "description": doc.get('description'),
             "x-owner": doc.get("actor"),
+            "x-cpps-name" : doc.get("name"),
             #"x-services": members,
             "x-atomicservices": atomic_names,
             "x-nestedcpps" : nested_cpps_names,
@@ -330,6 +331,7 @@ def cppn_service_schema(request, group_id):
             "version": "1.0.0",
             "description": doc.get("description", ""),
             "x-actors": doc.get("actors", []),
+            "x-cppn-name": doc.get("name"),
             "x-atomicservices": atomic_names,
             "x-nestedcpps": cppn_names,                
             "x-gdpr-map": doc.get("gdpr_map", {}),

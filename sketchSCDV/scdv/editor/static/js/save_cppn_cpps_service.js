@@ -96,7 +96,7 @@ async function saveCompositeService() {
     alert(`Error saving ${groupType}: ${err.message}`);
   }
 
-    // ✅ Se sto salvando un CPPS, verifico se è annidato in un altro CPPS
+    // Se sto salvando un CPPS, verifico se è annidato in un altro CPPS
   if (groupType === 'CPPS') {
     const parentGroup = findParentGroup(currentElement);
     if (parentGroup) {

@@ -11,7 +11,7 @@ function CustomContextPadProvider(
   this.getContextPadEntries = function (element) {
   const actions = {};
 
-  // ✅ Gestione cancellazione CPPS o CPPN (gruppi)
+  // Gestione cancellazione CPPS o CPPN (gruppi)
   if (element.type === 'bpmn:Group') {
     actions['delete'] = {
       group: 'edit',
@@ -31,7 +31,7 @@ function CustomContextPadProvider(
     };
   }
 
-  // ✅ Gestione cancellazione atomic task
+  // Gestione cancellazione atomic task
   if (element.type === 'bpmn:Task') {
     actions['delete'] = {
       group: 'edit',

@@ -3,7 +3,8 @@ from mongodb_handler import bpmn_collection
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.shortcuts import render, Http404
-from bson.objectid import ObjectId
+from bson import ObjectId
+from bson.errors import InvalidId
 
 def data_view_editor(request):
     return render(request, 'viewer/viewer.html')
@@ -22,9 +23,6 @@ def list_diagrams(request):
 
 @api_view(['GET'])
 def get_diagram(request, diagram_id):
-    from bson import ObjectId
-    from bson.errors import InvalidId
-
     try:
         obj_id = ObjectId(diagram_id)
     except InvalidId:

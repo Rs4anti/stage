@@ -9,9 +9,8 @@ from drf_spectacular.utils import extend_schema_view, extend_schema, OpenApiResp
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.http import JsonResponse
-from bson import ObjectId
+from bson import ObjectId, json_util
 from bson.errors import InvalidId
-
 
 def data_view_editor(request):
     return render(request, 'editor/view.html')
@@ -257,13 +256,8 @@ def get_cpps_service(request, group_id):
     if not service:
         return Response({'error': 'CPPS not found'}, status=404)
 
-    from bson import json_util
-    from django.http import JsonResponse
-
     return JsonResponse(service, safe=False, json_dumps_params={'default': json_util.default})
 
-
-from bson import json_util
 
 @api_view(['GET'])
 def get_atomic_service(request, task_id):
@@ -286,33 +280,27 @@ def get_all_services(request):
     })
 
 
-
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from rest_framework import status
-from bson.objectid import ObjectId
-
 @api_view(['DELETE'])
 def delete_group(request, group_id):
     deleted = False
 
-    # 🔍 Prova a cancellare dalla collezione CPPS
+    # Prova a cancellare dalla collezione CPPS
     if cpps_collection.find_one({'group_id': group_id}):
         cpps_collection.find_one_and_delete({'group_id': group_id})
         deleted = True
 
-    # 🔍 Prova a cancellare dalla collezione CPPN
+    # Prova a cancellare dalla collezione CPPN
     elif cppn_collection.find_one({'group_id': group_id}):
         cppn_collection.find_one_and_delete({'group_id': group_id})
         deleted = True
 
-    # 🔁 Rimuove il group_id da nested_cpps in altri CPPS
+    # Rimuove il group_id da nested_cpps in altri CPPS
     removed_from_cpps = cpps_collection.update_many(
         { 'nested_cpps': group_id },
         { '$pull': { 'nested_cpps': group_id } }
     )
 
-    # 🔁 Rimuove il group_id da nested_cpps in CPPN
+    # Rimuove il group_id da nested_cpps in CPPN
     removed_from_cppn = cppn_collection.update_many(
         { 'nested_cpps': group_id },
         { '$pull': { 'nested_cpps': group_id } }
@@ -320,13 +308,13 @@ def delete_group(request, group_id):
 
     if deleted:
         return Response({
-            'message': f'Gruppo {group_id} eliminato con successo',
+            'message': f'Gruppo {group_id} delted!',
             'removed_from_nested_cpps': removed_from_cpps.modified_count,
             'removed_from_nested_cppn': removed_from_cppn.modified_count
         }, status=status.HTTP_200_OK)
 
     return Response({
-        'error': f'Gruppo {group_id} non trovato',
+        'error': f'Gruppo {group_id} not found',
         'removed_from_nested_cpps': removed_from_cpps.modified_count,
         'removed_from_nested_cppn': removed_from_cppn.modified_count
     }, status=status.HTTP_404_NOT_FOUND)
