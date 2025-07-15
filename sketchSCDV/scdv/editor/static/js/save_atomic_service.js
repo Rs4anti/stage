@@ -1,3 +1,5 @@
+import { loadAvailableServices } from './editor.js';
+
 async function saveAtomicService() {
     console.log('Called function saveAtomicService.');
 
@@ -95,6 +97,7 @@ async function saveAtomicService() {
 
         if (response.ok) {
             console.log("✅ Atomic service saved successfully!", result);
+            await loadAvailableServices();
         } else {
             console.error("❌ Error saving:", result);
             alert("Error saving atomic service.");
@@ -117,6 +120,7 @@ async function saveAtomicService() {
         url,
         owner
     };
+    window.saveAtomicService = saveAtomicService;
 }
 
 
@@ -153,3 +157,6 @@ function validateAtomicServiceFields({ name, atomicType, inputParams, outputPara
 
     return true;
 }
+
+document.getElementById('save-atomic-button')
+  .addEventListener('click', saveAtomicService);

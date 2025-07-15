@@ -150,12 +150,15 @@ async function saveDiagram() {
     }
 
     if (response.ok) {
-      alert("✅ Diagram saved successfully!");
-      localStorage.setItem('diagramId', data.id);
-      window.diagramId = data.id;
+    alert("✅ Diagram saved successfully!");
+    localStorage.setItem('diagramId', data.id);
+    window.diagramId = data.id;
+  
+    await loadAvailableServices();
     } else {
-      alert("⚠️ Errore saving:\n" + JSON.stringify(data));
-    }
+    alert("⚠️ Errore saving:\n" + JSON.stringify(data));
+  }
+
   } catch (err) {
     console.error("❌ Error saving", err);
     alert("❌ Error.");
@@ -175,7 +178,6 @@ bpmnModeler.get('eventBus').on('element.click', function (e) {
   }
 
   loadDetailsFromMongo(el);
-
 });
 
 function resetDiagram() {
@@ -417,7 +419,7 @@ function renderNotFound(id) {
 }
 
 
-async function loadAvailableServices() {
+export async function loadAvailableServices() {
   try {
     const res = await fetch('/editor/api/all-services/');
     const data = await res.json();
