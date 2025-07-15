@@ -125,22 +125,39 @@ async function saveDiagram() {
 }
 
 
-
-
+let selectedElement = null;
+const editButton = document.getElementById('edit-details-button');
 
 bpmnModeler.get('eventBus').on('element.click', function (e) {
   const el = e.element;
 
-  if (el && el.type === 'bpmn:Task') {
-    openAtomicServiceForm(el);
-  }
-
-  if (el && el.type === 'bpmn:Group') {
-    openGroupClassificationForm(el);
+  if (el && (el.type === 'bpmn:Task' || el.type === 'bpmn:Group')) {
+    selectedElement = el;
+    editButton.classList.remove('d-none');  // Mostra bottone
+  } else {
+    selectedElement = null;
+    editButton.classList.add('d-none');  // Nasconde bottone
   }
 
   loadDetailsFromMongo(el);
 });
+
+
+document.getElementById('edit-details-button').addEventListener('click', function() {
+  if (!selectedElement) {
+    alert('Nessun elemento selezionato!');
+    return;
+  }
+
+  if (selectedElement.type === 'bpmn:Task') {
+    openAtomicServiceForm(selectedElement);
+  } else if (selectedElement.type === 'bpmn:Group') {
+    openGroupClassificationForm(selectedElement);
+  } else {
+    alert('Elemento non editabile!');
+  }
+});
+
 
 function resetDiagram() {
   localStorage.removeItem('diagramId');
