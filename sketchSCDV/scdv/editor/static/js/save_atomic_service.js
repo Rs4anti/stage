@@ -1,4 +1,4 @@
-import { loadAvailableServices } from './editor.js';
+import {getCookie, ensureDiagramSaved, loadAvailableServices } from './editor.js';
 
 async function saveAtomicService() {
     console.log('Called function saveAtomicService.');
@@ -8,8 +8,7 @@ async function saveAtomicService() {
         return;
     }
 
-    // Recupera il diagramId correttamente
-    let diagramId = window.diagramId || localStorage.getItem('diagramId');
+    let diagramId = await ensureDiagramSaved();
 
     const owner = document.getElementById('serviceOwner').value;
     const name = document.getElementById('serviceName').value;
@@ -24,31 +23,6 @@ async function saveAtomicService() {
     }
 
     const csrftoken = getCookie('csrftoken');
-
-    // Se il diagramId non è ancora salvato o non valido, salva prima il diagramma
-    if (!diagramId) {
-        const { xml } = await bpmnModeler.saveXML({ format: true });
-
-        const diagramName = prompt("Before saving atomic service, insert a diagram's name:");
-        if (!diagramName) return;
-
-        const diagramResponse = await fetch('/editor/api/save-diagram/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': csrftoken
-            },
-            body: JSON.stringify({
-                name: diagramName,
-                xml_content: xml
-            })
-        });
-
-        const diagramData = await diagramResponse.json();
-        diagramId = diagramData.id;
-        window.diagramId = diagramId;
-        localStorage.setItem('diagramId', diagramId);
-    }
 
     // Aggiunta estensione custom all’elemento BPMN selezionato
     const moddle = bpmnModeler.get('moddle');

@@ -1,4 +1,4 @@
-function getCookie(name) {
+export function getCookie(name) {
   let cookieValue = null;
   if (document.cookie && document.cookie !== '') {
     const cookies = document.cookie.split(';');
@@ -42,7 +42,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       await openDiagram(data.xml_content);
       localStorage.setItem('diagramId', data.id);
       window.diagramId = data.id;
-
+      localStorage.setItem('diagramId', data.id);
+      window.diagramHasFinalName = true;
+      
       console.log("Modalità modifica attivata per:", data.name);
     } catch (err) {
       console.error("Errore nel caricamento del diagramma:", err);
@@ -80,90 +82,50 @@ async function openDiagram(xml) {
 
 
 async function saveDiagram() {
-  try {
-    const { xml } = await bpmnModeler.saveXML({ format: true });
-    console.log(xml);
-
-    let diagramId = localStorage.getItem('diagramId');
-    const csrftoken = getCookie('csrftoken');
-
-    let url = '/editor/api/save-diagram/';
-    let method = 'POST';
-    let body = {
-      xml_content: xml
-    };
-
-    //Verifica se esiste già un diagramma con quell'ID
-    if (diagramId) {
-      const check = await fetch(`/editor/api/save-diagram/${diagramId}/`, { method: 'GET' });
-
-      if (check.ok) {
-        console.log("Diagram already exist → PUT");
-        url += `${diagramId}/`;
-        method = 'PUT';
-      } else {
-        console.log("ID saved is not of any diagram → POST");
-        diagramId = null;
-        localStorage.removeItem('diagramId');
-      }
-    }
-
-    //Se nuovo, chiedo nome e verifica univocità
-    if (!diagramId) {
-      const name = prompt("Insert a name for the BPMN diagram:");
-      if (!name) return;
-
-      //Verifica se esiste già un diagramma con questo nome
-      const nameCheck = await fetch(`/editor/api/check-name/?name=${encodeURIComponent(name)}`);
-      if (!nameCheck.ok) {
-        alert("Name checking error!");
-        return;
-      }
-
-      const nameExists = await nameCheck.json();
-      if (nameExists.exists) {
-        alert("⚠️ A diagram with this name already exist. Choose another name.");
-        return;
-      }
-
-      body.name = name;
-    }
-
-    // Salvataggio
-    const response = await fetch(url, {
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': csrftoken
-      },
-      body: JSON.stringify(body)
-    });
-
-    const responseText = await response.text();
-    let data;
     try {
-      data = JSON.parse(responseText);
-    } catch (parseError) {
-      console.error("❌ Parsing error JSON:", responseText);
-      alert("❌ Server error: not valid reply.");
-      return;
+        const { xml } = await bpmnModeler.saveXML({ format: true });
+        const csrftoken = getCookie('csrftoken');
+
+        // Assicura che abbiamo già un diagramId (draft se necessario)
+        const diagramId = await ensureDiagramSaved();
+
+        let url = `/editor/api/save-diagram/${diagramId}/`;
+        let method = 'PUT';
+        let body = { xml_content: xml };
+
+        if (!window.diagramHasFinalName) {
+            const newName = prompt("Insert a name for the diagram:");
+            if (!newName) return; // utente ha annullato
+            body.name = newName;
+            window.diagramHasFinalName = true;
+            console.log(`✅ Renaming diagram ${diagramId} to '${newName}'`);
+        }
+
+        const response = await fetch(url, {
+            method,
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken
+            },
+            body: JSON.stringify(body)
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+            alert("✅ Diagram saved successfully!");
+            window.diagramId = data.id;
+            localStorage.setItem('diagramId', data.id);
+        } else {
+            alert("⚠️ Error saving:\n" + JSON.stringify(data));
+        }
+    } catch (err) {
+        console.error("❌ Error saving diagram", err);
+        alert("❌ Error saving diagram.");
     }
-
-    if (response.ok) {
-    alert("✅ Diagram saved successfully!");
-    localStorage.setItem('diagramId', data.id);
-    window.diagramId = data.id;
-  
-    await loadAvailableServices();
-    } else {
-    alert("⚠️ Errore saving:\n" + JSON.stringify(data));
-  }
-
-  } catch (err) {
-    console.error("❌ Error saving", err);
-    alert("❌ Error.");
-  }
 }
+
+
+
 
 
 bpmnModeler.get('eventBus').on('element.click', function (e) {
@@ -458,4 +420,40 @@ export async function loadAvailableServices() {
   } catch (err) {
     console.error('Error loading services:', err);
   }
+}
+
+export async function ensureDiagramSaved() {
+    let diagramId = window.diagramId || localStorage.getItem('diagramId');
+
+    if (!diagramId) {
+        const { xml } = await bpmnModeler.saveXML({ format: true });
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const diagramName = `Draft Diagram ${timestamp}`;
+
+        const csrftoken = getCookie('csrftoken');
+
+        const response = await fetch('/editor/api/save-diagram/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken
+            },
+            body: JSON.stringify({
+                name: diagramName,
+                xml_content: xml
+            })
+        });
+
+        const result = await response.json();
+        diagramId = result.id;
+
+        // 💥 Qui memorizzi l'id e segni come draft
+        window.diagramId = diagramId;
+        localStorage.setItem('diagramId', diagramId);
+        window.diagramHasFinalName = false;
+
+        console.log(`✅ Auto-saved new diagram: ${diagramName} (ID: ${diagramId})`);
+    }
+
+    return diagramId;
 }

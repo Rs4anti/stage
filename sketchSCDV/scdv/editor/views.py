@@ -24,7 +24,6 @@ def check_diagram_name(request):
     exists = bpmn_collection.find_one({ 'name': { '$regex': f'^{name}$', '$options': 'i' } }) is not None
     return JsonResponse({'exists': exists})
 
-
 @api_view(['POST', 'PUT', 'GET'])
 def save_diagram(request, diagram_id=None):
     data = request.data
@@ -54,20 +53,23 @@ def save_diagram(request, diagram_id=None):
         if not diagram_id:
             return Response({'error': 'Diagram ID is required'}, status=400)
 
+        update_fields = {
+            "xml_content": data['xml_content'],
+            "updated_at": now()
+        }
+
+        if 'name' in data:
+            update_fields['name'] = data['name']
+
         result = bpmn_collection.update_one(
             {"_id": ObjectId(diagram_id)},
-            {"$set": {
-                "xml_content": data['xml_content'],
-                "updated_at": now()
-            }}
+            {"$set": update_fields}
         )
 
         if result.matched_count == 0:
             return Response({'error': 'Diagram not found'}, status=404)
 
         return Response({'id': diagram_id, 'status': 'updated'})
-
-
 
 @api_view(['POST'])
 def save_atomic_service(request):
