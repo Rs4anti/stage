@@ -1,3 +1,5 @@
+import { loadAvailableServices } from './editor.js';
+
 async function saveCompositeService() {
   console.log('Function saveCompositeService called');
 
@@ -127,6 +129,8 @@ async function saveCompositeService() {
   }
 
   bootstrap.Modal.getInstance(document.getElementById('groupTypeModal')).hide();
+  
+  await loadAvailableServices();
 }
 
 function getCookie(name) {
@@ -248,3 +252,6 @@ function findParentGroup(innerGroup) {
   });
 }
 
+
+document.getElementById('save-composite-button')
+  .addEventListener('click', saveCompositeService);

@@ -418,7 +418,6 @@ function renderNotFound(id) {
   section.innerHTML = `<p class="text-muted">No service found for <code>${id}</code>.</p>`;
 }
 
-
 export async function loadAvailableServices() {
   try {
     const res = await fetch('/editor/api/all-services/');
