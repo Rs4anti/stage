@@ -20,8 +20,25 @@ class AtomicServiceSeeder:
     def random_type(self):
         return random.choice(self.ALLOWED_TYPES)
 
+    def random_value_for_type(self, type_):
+        if type_ == 'Int':
+            return str(random.randint(0, 100))
+        elif type_ == 'Float':
+            return str(round(random.uniform(0, 100), 2))
+        elif type_ == 'Bool':
+            return random.choice(['True', 'False'])
+        elif type_ == 'String':
+            return self.random_string(5)
+        else:
+            return 'Unknown'
+
     def random_params(self, count=3):
-        return [{'name': self.random_string(5), 'type': self.random_type()} for _ in range(count)]
+        params = []
+        for _ in range(count):
+            type_ = self.random_type()
+            value = self.random_value_for_type(type_)
+            params.append({'name': value, 'type': type_})
+        return params
 
     def generate_service(self):
         diagram_id = ObjectId()
