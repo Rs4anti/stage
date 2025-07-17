@@ -3,7 +3,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from django.views.decorators.csrf import csrf_exempt
-from mongodb_handler import atomic_services_collection, cpps_collection, cppn_collection, bpmn_collection
+from utilities.mongodb_handler import atomic_services_collection, cpps_collection, cppn_collection, bpmn_collection
 from django.utils.timezone import now
 from drf_spectacular.utils import extend_schema_view, extend_schema, OpenApiResponse
 from rest_framework.views import APIView
@@ -71,53 +71,77 @@ def save_diagram(request, diagram_id=None):
 
         return Response({'id': diagram_id, 'status': 'updated'})
 
+from utilities.atomic_dataframe import DataFrameAtomic, InvalidTypeError
+
+def parse_param_list(param_list):
+    parsed = []
+    for item in param_list:
+        item = item.strip()
+        if item == "":
+            continue
+        if item.isdigit():
+            type_ = 'Int'
+        else:
+            try:
+                float(item)
+                type_ = 'Float'
+            except ValueError:
+                type_ = 'String'
+        parsed.append({'name': item, 'type': type_})
+    return parsed
+
 @api_view(['POST'])
 def save_atomic_service(request):
-    from bson import ObjectId
-
     data = request.data
-    print("=== Payload received:", data)
-
-    required_fields = ['diagram_id', 'task_id', 'name', 'atomic_type', 'input_params', 'output_params', 'method', 'url']
-    missing = [f for f in required_fields if f not in data]
+    required = ['diagram_id', 'task_id', 'name', 'atomic_type', 'input_params', 'output_params', 'method', 'url', 'owner']
+    missing = [f for f in required if f not in data]
     if missing:
-        return Response({'error': f'Missing fields: {", ".join(missing)}'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'error': f"Missing fields: {', '.join(missing)}"}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Normalize input/output params
+    if isinstance(data['input_params'], list) and all(isinstance(i, str) for i in data['input_params']):
+        data['input_params'] = parse_param_list(data['input_params'])
+
+    if isinstance(data['output_params'], list) and all(isinstance(i, str) for i in data['output_params']):
+        data['output_params'] = parse_param_list(data['output_params'])
 
     try:
-        diagram_id = ObjectId(data['diagram_id'])
-    except Exception:
-        return Response({'error': 'Invalid diagram ID'}, status=status.HTTP_400_BAD_REQUEST)
+        ObjectId(data['diagram_id'])
+    except:
+        return Response({'error': "Invalid diagram ID"}, status=status.HTTP_400_BAD_REQUEST)
 
-    diagram = bpmn_collection.find_one({'_id': diagram_id})
-    if not diagram:
-        return Response({'error': 'Diagram not found'}, status=status.HTTP_404_NOT_FOUND)
+    df_atomic = DataFrameAtomic(data)
+    try:
+        df_atomic.create_main_dataframe()
+        df_atomic.create_io_dataframes()
+        flatted_df = df_atomic.get_flatted_wide_table()
+        # Visualizza o esporta
+        print(flatted_df)
+    except InvalidTypeError as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    serialized = df_atomic.get_serialized()
+    print("MAIN\n", df_atomic.df_main)
+    print("INPUT\n", df_atomic.df_input)
+    print("OUTPUT\n", df_atomic.df_output)
 
     try:
         result = atomic_services_collection.update_one(
             {'task_id': data['task_id']},
-            {
-                '$set': {
-                    'diagram_id': str(diagram_id),
-                    'name': data['name'],
-                    'atomic_type': data['atomic_type'],
-                    'input_params': data['input_params'],
-                    'output_params': data['output_params'],
-                    'method': data['method'],
-                    'url': data['url'],
-                    'owner' : data['owner']
-                }
-            },
+            {'$set': {
+                'diagram_id': data['diagram_id'],
+                'name': data['name'],
+                'atomic_type': data['atomic_type'],
+                'method': data['method'],
+                'url': data['url'],
+                'owner': data['owner'],
+                'dataframe_serialized': serialized
+            }},
             upsert=True
         )
-
-        created = result.upserted_id is not None
-        print("=== Atomic saved in Mongo. created:", created)
-
-        return Response({'status': 'ok', 'created': created})
-
+        return Response({'status':'ok','created': result.upserted_id is not None})
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 @api_view(['POST'])
 def save_cppn_service(request):

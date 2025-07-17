@@ -2,7 +2,7 @@ from django.shortcuts import render
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 import uuid
-from mongodb_handler import bpmn_collection
+from utilities.mongodb_handler import bpmn_collection
 from django.shortcuts import render
 
 def importer_home(request):

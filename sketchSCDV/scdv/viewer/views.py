@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from mongodb_handler import bpmn_collection
+from utilities.mongodb_handler import bpmn_collection
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.shortcuts import render, Http404

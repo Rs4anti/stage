@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'importer',
     'rest_framework',
     'drf_spectacular',
+    'utilities',
 ]
 
 REST_FRAMEWORK = {

@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from mongodb_handler import atomic_services_collection, cpps_collection, cppn_collection
+from utilities.mongodb_handler import atomic_services_collection, cpps_collection, cppn_collection
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.http import JsonResponse
