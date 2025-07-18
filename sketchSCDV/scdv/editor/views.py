@@ -11,6 +11,7 @@ from rest_framework.response import Response
 from django.http import JsonResponse
 from bson import ObjectId, json_util
 from bson.errors import InvalidId
+from utilities.atomic_dataframe import DataFrameAtomic, InvalidTypeError
 
 def data_view_editor(request):
     return render(request, 'editor/view.html')
@@ -71,7 +72,7 @@ def save_diagram(request, diagram_id=None):
 
         return Response({'id': diagram_id, 'status': 'updated'})
 
-from utilities.atomic_dataframe import DataFrameAtomic, InvalidTypeError
+
 
 def parse_param_list(param_list):
     parsed = []
@@ -243,15 +244,10 @@ def save_cpps_service(request):
             "name": data['name'],
             "description": data['description'],
             "workflow_type": data['workflow_type'],
-            "atomic_services": data['members'],
             "actor": data['actor'],
-            "endpoints": data['endpoints']
+            "endpoints": data['endpoints'],
+            "components": data['members'] + data.get('nested_cpps', [])
         }
-
-        # Aggiungo i CPPS annidati se presenti
-        if 'nested_cpps' in data:
-            print(data['nested_cpps'])
-            doc['nested_cpps'] = data['nested_cpps']
 
         # Salvo nel DB
         result = cpps_collection.update_one(

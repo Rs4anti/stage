@@ -145,18 +145,19 @@ bpmnModeler.get('eventBus').on('element.click', function (e) {
 
 document.getElementById('edit-details-button').addEventListener('click', function() {
   if (!selectedElement) {
-    alert('Nessun elemento selezionato!');
+    alert('No item selected!');
     return;
   }
 
   if (selectedElement.type === 'bpmn:Task') {
     openAtomicServiceForm(selectedElement);
   } else if (selectedElement.type === 'bpmn:Group') {
-    openGroupClassificationForm(selectedElement);
+    openGroupClassificationForm(selectedElement);  // ✅ qui ci entri SOLO se premi il bottone
   } else {
     alert('Elemento non editabile!');
   }
 });
+
 
 
 function resetDiagram() {
@@ -201,7 +202,7 @@ async function loadDetailsFromMongo(element) {
       if (cppnRes.ok) {
         const cppnData = await cppnRes.json();
         renderDetails(cppnData, 'CPPN');
-        openGroupClassificationForm(element, cppnData);
+        //openGroupClassificationForm(element, cppnData);
         return;
       }
     } catch (err) {
@@ -214,7 +215,7 @@ async function loadDetailsFromMongo(element) {
       if (cppsRes.ok) {
         const cppsData = await cppsRes.json();
         renderDetails(cppsData, 'CPPS');
-        openGroupClassificationForm(element, cppsData);
+        //openGroupClassificationForm(element, cppsData);
         return;
       }
     } catch (err) {

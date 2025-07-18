@@ -102,7 +102,7 @@ async function saveCompositeService() {
   if (groupType === 'CPPS') {
     const parentGroup = findParentGroup(currentElement);
     if (parentGroup) {
-      console.log("↪️ Il gruppo è annidato dentro:", parentGroup.id);
+      console.log("Il gruppo è annidato dentro:", parentGroup.id);
 
       const csrftoken = getCookie('csrftoken');
 
