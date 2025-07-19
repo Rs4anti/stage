@@ -131,6 +131,8 @@ const editButton = document.getElementById('edit-details-button');
 bpmnModeler.get('eventBus').on('element.click', function (e) {
   const el = e.element;
 
+  console.log("Elemento selezionato " + el.type);  
+
   if (el && (el.type === 'bpmn:Task' || el.type === 'bpmn:Group')) {
     selectedElement = el;
     editButton.classList.remove('d-none');  // Mostra bottone
@@ -152,7 +154,10 @@ document.getElementById('edit-details-button').addEventListener('click', functio
   if (selectedElement.type === 'bpmn:Task') {
     openAtomicServiceForm(selectedElement);
   } else if (selectedElement.type === 'bpmn:Group') {
-    openGroupClassificationForm(selectedElement);  // ✅ qui ci entri SOLO se premi il bottone
+  openGroupClassificationForm(
+    selectedElement,
+    selectedElement.businessObject.loadedData || null
+  );
   } else {
     alert('Elemento non editabile!');
   }
@@ -201,6 +206,7 @@ async function loadDetailsFromMongo(element) {
       const cppnRes = await fetch(`/editor/api/cppn_service/${id}/`);
       if (cppnRes.ok) {
         const cppnData = await cppnRes.json();
+        element.businessObject.loadedData = cppnData;
         renderDetails(cppnData, 'CPPN');
         //openGroupClassificationForm(element, cppnData);
         return;
@@ -214,6 +220,7 @@ async function loadDetailsFromMongo(element) {
       const cppsRes = await fetch(`/editor/api/cpps_service/${id}/`);
       if (cppsRes.ok) {
         const cppsData = await cppsRes.json();
+        element.businessObject.loadedData = cppsData;
         renderDetails(cppsData, 'CPPS');
         //openGroupClassificationForm(element, cppsData);
         return;

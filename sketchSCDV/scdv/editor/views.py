@@ -3,7 +3,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from django.views.decorators.csrf import csrf_exempt
-from utilities.mongodb_handler import atomic_services_collection, cpps_collection, cppn_collection, bpmn_collection
+from utilities.mongodb_handler import atomic_services_collection, cpps_collection, cppn_collection, bpmn_collection, openapi_collection, MongoDBHandler
 from django.utils.timezone import now
 from drf_spectacular.utils import extend_schema_view, extend_schema, OpenApiResponse
 from rest_framework.views import APIView
@@ -91,59 +91,14 @@ def parse_param_list(param_list):
         parsed.append({'name': item, 'type': type_})
     return parsed
 
+
 @api_view(['POST'])
 def save_atomic_service(request):
     data = request.data
-    required = ['diagram_id', 'task_id', 'name', 'atomic_type', 'input_params', 'output_params', 'method', 'url', 'owner']
-    missing = [f for f in required if f not in data]
-    if missing:
-        return Response({'error': f"Missing fields: {', '.join(missing)}"}, status=status.HTTP_400_BAD_REQUEST)
-
-    # Normalize input/output params
-    if isinstance(data['input_params'], list) and all(isinstance(i, str) for i in data['input_params']):
-        data['input_params'] = parse_param_list(data['input_params'])
-
-    if isinstance(data['output_params'], list) and all(isinstance(i, str) for i in data['output_params']):
-        data['output_params'] = parse_param_list(data['output_params'])
-
-    try:
-        ObjectId(data['diagram_id'])
-    except:
-        return Response({'error': "Invalid diagram ID"}, status=status.HTTP_400_BAD_REQUEST)
-
-    df_atomic = DataFrameAtomic(data)
-    try:
-        df_atomic.create_main_dataframe()
-        df_atomic.create_io_dataframes()
-        flatted_df = df_atomic.get_flatted_wide_table()
-        # Visualizza o esporta
-        print(flatted_df)
-    except InvalidTypeError as e:
-        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-    serialized = df_atomic.get_serialized()
-    print("MAIN\n", df_atomic.df_main)
-    print("INPUT\n", df_atomic.df_input)
-    print("OUTPUT\n", df_atomic.df_output)
-
-    try:
-        result = atomic_services_collection.update_one(
-            {'task_id': data['task_id']},
-            {'$set': {
-                'diagram_id': data['diagram_id'],
-                'name': data['name'],
-                'atomic_type': data['atomic_type'],
-                'method': data['method'],
-                'url': data['url'],
-                'owner': data['owner'],
-                'dataframe_serialized': serialized
-            }},
-            upsert=True
-        )
-        return Response({'status':'ok','created': result.upserted_id is not None})
-    except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+    print("=== Payload received:", data)
+    result, status_code = MongoDBHandler.save_atomic(data)
+    return Response(result, status=status_code)
+    
 @api_view(['POST'])
 def save_cppn_service(request):
     data = request.data
@@ -187,12 +142,13 @@ def save_cppn_service(request):
             'workflow_type': data['workflow_type'],
             'actors': data['actors'],
             'gdpr_map': data['gdpr_map'],
-            'atomic_services': data['members'],
         }
 
-        # Aggiungo cpps se presenti
-        if 'nested_cpps' in data:
-            doc['nested_cpps'] = data['nested_cpps']
+        # Unisco atomic_services + nested_cpps in components
+        if 'components' in data:
+            doc['components'] = data['components']
+        else:
+            doc['components'] = data['members'] + data.get('nested_cpps', [])
 
         result = cppn_collection.update_one(
             {'group_id': data['group_id']},
@@ -204,6 +160,7 @@ def save_cppn_service(request):
 
     except Exception as e:
         return Response({'error': str(e)}, status=500)
+
 
 @api_view(['POST'])
 def save_cpps_service(request):
