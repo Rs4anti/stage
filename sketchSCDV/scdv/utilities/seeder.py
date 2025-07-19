@@ -8,13 +8,13 @@ def random_string(length=6):
     return ''.join(random.choices(string.ascii_lowercase, k=length))
 
 def random_bool():
-    return random.choice([True, False])
+    return str(random.choice([True, False]))
 
 def random_float():
-    return round(random.uniform(1, 100), 3)
+    return str(round(random.uniform(1, 100), 2))
 
 def random_int():
-    return random.randint(1, 100)
+    return str(random.randint(1, 100))
 
 # Seeder loop
 for i in range(30):
@@ -22,21 +22,21 @@ for i in range(30):
         'task_id': f'Activity_{random_string(8)}',
         'atomic_type': random.choice(['collect', 'process&monitor', 'dispatch', 'display']),
         'diagram_id': str(ObjectId()),
-        'input_params': [
-            {'value': random_string(), 'type': 'string'},
-            {'value': str(random_bool()), 'type': 'bool'},
-            {'value': str(random_float()), 'type': 'float'},
-            {'value': str(random_float()), 'type': 'float'}
+        'input': [
+            random_string(),
+            random_bool(),
+            random_int(),
+            random_float()
         ],
         'method': random.choice(['GET', 'POST', 'PUT', 'DELETE']),
         'name': f'as_{i}',
-        'output_params': [
-            {'value': random_string(), 'type': 'string'},
-            {'value': str(random_bool()).lower(), 'type': 'bool'},
-            {'value': str(random_int()), 'type': 'int'}
+        'output': [
+            random_string(),
+            random_bool(),
+            random_int()
         ],
         'owner': random.choice(['paolo', 'maria', 'giulia', 'luca']),
-        'url': f'/prova{i}'
+        'url': f'/url{i}'
     }
 
     atomic_services_collection.insert_one(doc)
