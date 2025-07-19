@@ -95,131 +95,25 @@ def parse_param_list(param_list):
 @api_view(['POST'])
 def save_atomic_service(request):
     data = request.data
-    print("=== Payload received:", data)
+    print("===Atomic Payload received:", data)
     result, status_code = MongoDBHandler.save_atomic(data)
     return Response(result, status=status_code)
     
 @api_view(['POST'])
 def save_cppn_service(request):
-    data = request.data
-    required_fields = [
-        'diagram_id',
-        'group_id',
-        'name',
-        'description',
-        'workflow_type',
-        'members',
-        'actors',
-        'gdpr_map'
-    ]
+     data = request.data
+     print("===CPPN Payload received:", data)
+     result, status_code = MongoDBHandler.save_cppn(data)
 
-    missing = [f for f in required_fields if f not in data]
-    if missing:
-        return Response({'error': f'Missing fields: {", ".join(missing)}'}, status=400)
-
-    if not isinstance(data['actors'], list):
-        return Response({'error': 'Field "actors" must be a list'}, status=400)
-
-    if not isinstance(data['gdpr_map'], dict):
-        return Response({'error': 'Field "gdpr_map" must be a JSON object'}, status=400)
-
-    try:
-        diagram_id = ObjectId(data['diagram_id'])
-    except Exception:
-        return Response({'error': 'Invalid diagram ID'}, status=400)
-
-    diagram = bpmn_collection.find_one({'_id': diagram_id})
-    if not diagram:
-        return Response({'error': 'Diagram not found'}, status=404)
-
-    try:
-        doc = {
-            "group_type": "CPPN",
-            'diagram_id': str(diagram_id),
-            'group_id': data['group_id'],
-            'name': data['name'],
-            'description': data['description'],
-            'workflow_type': data['workflow_type'],
-            'actors': data['actors'],
-            'gdpr_map': data['gdpr_map'],
-        }
-
-        # Unisco atomic_services + nested_cpps in components
-        if 'components' in data:
-            doc['components'] = data['components']
-        else:
-            doc['components'] = data['members'] + data.get('nested_cpps', [])
-
-        result = cppn_collection.update_one(
-            {'group_id': data['group_id']},
-            {'$set': doc},
-            upsert=True
-        )
-
-        return Response({'status': 'ok', 'created': result.upserted_id is not None})
-
-    except Exception as e:
-        return Response({'error': str(e)}, status=500)
-
+     return Response(result, status=status_code)
 
 @api_view(['POST'])
 def save_cpps_service(request):
     data = request.data
-    required_fields = [
-        'diagram_id',
-        'group_id',
-        'name',
-        'description',
-        'workflow_type',
-        'members',
-        'actor',
-        'endpoints'
-    ]
+    print("===CPPS Payload received:", data)
+    result, status_code = MongoDBHandler.save_cpps(data)
 
-    # Verifica presenza dei campi obbligatori
-    missing = [f for f in required_fields if f not in data]
-    if missing:
-        return Response({'error': f'Missing fields: {", ".join(missing)}'}, status=400)
-
-    # Valida diagram_id
-    try:
-        diagram_id = ObjectId(data['diagram_id'])
-    except Exception:
-        return Response({'error': 'Invalid diagram ID'}, status=400)
-
-    # Verifica che il diagramma esista
-    diagram = bpmn_collection.find_one({'_id': diagram_id})
-    if not diagram:
-        return Response({'error': 'Diagram not found'}, status=404)
-
-    try:
-        # Crea il documento da salvare
-        doc = {
-            "group_type": "CPPS",
-            "diagram_id": str(diagram_id),
-            "group_id": data['group_id'],
-            "name": data['name'],
-            "description": data['description'],
-            "workflow_type": data['workflow_type'],
-            "actor": data['actor'],
-            "endpoints": data['endpoints'],
-            "components": data['members'] + data.get('nested_cpps', [])
-        }
-
-        # Salvo nel DB
-        result = cpps_collection.update_one(
-            {'group_id': data['group_id']},
-            {'$set': doc},
-            upsert=True
-        )
-
-        return Response({
-            'status': 'ok',
-            'created': result.upserted_id is not None
-        })
-
-    except Exception as e:
-        return Response({'error': str(e)}, status=500)
+    return Response(result, status=status_code)
 
 @api_view(['GET'])
 def get_cppn_service(request, group_id):
