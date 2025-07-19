@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from django.http import JsonResponse
 from bson import ObjectId, json_util
 from bson.errors import InvalidId
-#from utilities.mongodb_dataframe_builder import DataFrameAtomic, InvalidTypeError
+from utilities.mongodb_dataframe_builder import AtomicServiceDataFrameBuilder
 
 def data_view_editor(request):
     return render(request, 'editor/view.html')

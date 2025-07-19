@@ -4,7 +4,7 @@ class AtomicServiceDataFrameBuilder:
 
     @staticmethod
     def from_document(doc):
-        # DataFrame 1: overview
+        # Overview dataframe
         overview_data = {
             'task_id': [doc['task_id']],
             'diagram_id': [doc['diagram_id']],
@@ -16,22 +16,22 @@ class AtomicServiceDataFrameBuilder:
         }
         overview_df = pd.DataFrame(overview_data)
 
-        # DataFrame 2: input/output params
+        # Parameters dataframe
         params_rows = []
 
         for param in doc.get('input_params', []):
             params_rows.append({
                 'task_id': doc['task_id'],
-                'param_name': param,
-                'param_type': 'string',   # per ora default, in futuro potrai arricchire
+                'param_name': param['value'],
+                'param_type': param['type'],
                 'io_type': 'input'
             })
 
         for param in doc.get('output_params', []):
             params_rows.append({
                 'task_id': doc['task_id'],
-                'param_name': param,
-                'param_type': 'string',
+                'param_name': param['value'],
+                'param_type': param['type'],
                 'io_type': 'output'
             })
 
