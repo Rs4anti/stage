@@ -28,6 +28,46 @@ class MongoDBHandler:
         if not diagram:
             return {'error': 'Diagram not found'}, 404
 
+        def detect_type(value):
+            # Se già non è stringa, usa direttamente type()
+            if isinstance(value, bool):
+                return 'bool'
+            elif isinstance(value, int):
+                return 'int'
+            elif isinstance(value, float):
+                return 'float'
+
+            # Se è stringa, prova a convertirlo
+            if isinstance(value, str):
+                val = value.strip()
+                if val.lower() in ['true', 'false']:
+                    return 'bool'
+                try:
+                    int(val)
+                    return 'int'
+                except ValueError:
+                    pass
+                try:
+                    float(val)
+                    return 'float'
+                except ValueError:
+                    pass
+                return 'string'
+            return 'unknown'
+
+
+        def process_params(params):
+            processed = []
+            for item in params:
+                processed.append({
+                    'value': item,
+                    'type': detect_type(item)
+                })
+            return processed
+
+        input_processed = process_params(data['input_params'])
+        output_processed = process_params(data['output_params'])
+
         try:
             result = atomic_services_collection.update_one(
                 {'task_id': data['task_id']},
@@ -36,8 +76,8 @@ class MongoDBHandler:
                         'diagram_id': str(diagram_id),
                         'name': data['name'],
                         'atomic_type': data['atomic_type'],
-                        'input_params': data['input_params'],
-                        'output_params': data['output_params'],
+                        'input_params': input_processed,
+                        'output_params': output_processed,
                         'method': data['method'],
                         'url': data['url'],
                         'owner': data['owner']
