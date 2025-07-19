@@ -44,7 +44,7 @@ class AtomicServiceDataFrameBuilder:
         # Parameters dataframe
         params_rows = []
 
-        for param in doc.get('input_params', []):
+        for param in doc.get('input', []):
             params_rows.append({
                 'task_id': doc['task_id'],
                 'param_name': param,
@@ -52,7 +52,7 @@ class AtomicServiceDataFrameBuilder:
                 'io_type': 'input'
             })
 
-        for param in doc.get('output_params', []):
+        for param in doc.get('output', []):
             params_rows.append({
                 'task_id': doc['task_id'],
                 'param_name': param,

@@ -41,8 +41,8 @@ class MongoDBHandler:
                         'diagram_id': str(diagram_id),
                         'name': data['name'],
                         'atomic_type': data['atomic_type'],
-                        'input_params': data['input_params'],
-                        'output_params': data['output_params'],
+                        'input': data['input_params'],
+                        'output': data['output_params'],
                         'method': data['method'],
                         'url': data['url'],
                         'owner': data['owner']
