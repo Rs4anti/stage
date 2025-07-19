@@ -17,6 +17,8 @@ function openAtomicServiceForm(element, isNew = false) {
   let outputParams = '';
   let method = '';
   let url = '';
+  let owner = '';
+  
 
   //popolo campi form se oggetto bpmn gia presente -> bo = business object
   if (bo.extensionElements?.values?.length) {
@@ -27,6 +29,7 @@ function openAtomicServiceForm(element, isNew = false) {
       outputParams = customExt.outputParams || '';
       method = customExt.method || '';
       url = customExt.url || '';
+      owner = customExt.owner || 'LETTO MALE';
     }
   }
 
@@ -36,6 +39,7 @@ function openAtomicServiceForm(element, isNew = false) {
   document.getElementById('outputParams').value = outputParams;
   document.getElementById('httpMethod').value = method;
   document.getElementById('serviceUrl').value = url;
+  document.getElementById('owner').value = owner;
 
   const modalEl = document.getElementById('atomicServiceModal');
   const modal = new bootstrap.Modal(modalEl);

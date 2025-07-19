@@ -10,7 +10,7 @@ async function saveAtomicService() {
 
     let diagramId = await ensureDiagramSaved();
 
-    const owner = document.getElementById('serviceOwner').value;
+    const owner = document.getElementById('owner').value;
     const name = document.getElementById('serviceName').value;
     const atomicType = document.getElementById('atomicType').value;
     const inputParams = document.getElementById('inputParams').value.split(',').map(s => s.trim());

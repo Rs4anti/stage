@@ -34,7 +34,10 @@ const customModdle = {
           name: 'url',
           isAttr: false,
           type: 'String'
-        }
+        },
+        { name: 'owner',
+          isAttr: false,
+          type: 'String' }
       ]
     },
     // CPPS/CPPN
