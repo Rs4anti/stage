@@ -12,6 +12,8 @@ function openGroupClassificationForm(element, existingData = null) {
   let actors = '';
   let gdprMap = {};
   let endpoints = [];
+  console.log('GDPR MAP detected:', gdprMap);
+
 
   //dati da MongoDB (API get_cppn_service o get_cpps_service)
   if (existingData) {
@@ -158,16 +160,21 @@ function addGdprRow(actor = '', role = '') {
   const row = document.createElement('div');
   row.classList.add('d-flex', 'mb-2', 'gap-2');
 
+  console.log('Adding GDPR row for:', actor, role);
+
+
   row.innerHTML = `
     <input type="text" class="form-control form-control-sm bg-light text-muted" value="${actor}" readonly>
-    <input type="text" class="form-control form-control-sm" placeholder="Role (e.g., Controller)" value="${role}">
+    <select class="form-select form-select-sm" data-actor="${actor}">
+      <option value="Data Controller" ${role === 'Data Controller' ? 'selected' : ''}>Data Controller</option>
+      <option value="Data Processor" ${role === 'Data Processor' ? 'selected' : ''}>Data Processor</option>
+      <option value="Data Subject" ${role === 'Data Subject' ? 'selected' : ''}>Data Subject</option>
+      <option value="Supervisory Authority" ${role === 'Supervisory Authority' ? 'selected' : ''}>Supervisory Authority</option>
+    </select>
   `;
 
   container.appendChild(row);
 }
-
-
-
 
 function toggleCPPNFields() {
   const type = document.getElementById('groupTypeSelect').value;
@@ -208,6 +215,9 @@ function detectGroupParticipants(groupElement) {
     );
   });
 
+  
+  console.log('Detected participants:', intersecting.map(getParticipantName));
+
   return intersecting.map(getParticipantName);
 }
 
@@ -220,6 +230,8 @@ function getParticipantName(element) {
 function populateGdprMappingFromActorsInvolved() {
   const gdprContainer = document.getElementById('gdprMapContainer');
   gdprContainer.innerHTML = '';
+  console.log('ActorsInvolved value:', raw);
+
 
   const raw = document.getElementById('actorsInvolved').value;
   const actors = raw.split(',').map(a => a.trim()).filter(a => a.length > 0);

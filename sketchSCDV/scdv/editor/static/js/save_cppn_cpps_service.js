@@ -16,16 +16,19 @@ async function saveCompositeService() {
   const actors = document.getElementById('actorsInvolved')?.value.trim() || '';
 
   //GDPR Mapping dinamico
+ // GDPR Mapping dinamico (aggiornato per usare <select>)
   const gdprMap = {};
   const gdprMapContainer = document.getElementById('gdprMapContainer');
   [...gdprMapContainer.children].forEach(row => {
-    const inputs = row.querySelectorAll('input');
-    const actorName = inputs[0]?.value.trim();
-    const role = inputs[1]?.value.trim();
-    if (actorName && role) {
-      gdprMap[actorName] = role;
-    }
-  });
+  const actorInput = row.querySelector('input');
+  const roleSelect = row.querySelector('select');
+  const actorName = actorInput?.value.trim();
+  const role = roleSelect?.value.trim();
+  if (actorName && role) {
+    gdprMap[actorName] = role;
+  }
+});
+
 
   //Endpoint dinamici (solo CPPS)
   const endpointRows = document.querySelectorAll('#endpointsContainer > div');
@@ -251,7 +254,6 @@ function findParentGroup(innerGroup) {
     );
   });
 }
-
 
 document.getElementById('save-composite-button')
   .addEventListener('click', saveCompositeService);
