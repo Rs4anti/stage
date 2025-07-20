@@ -193,7 +193,7 @@ class MongoDBHandler:
                 "name": data['name'],
                 "description": data['description'],
                 "workflow_type": data['workflow_type'],
-                "actor": data['actor'],
+                "owner": data['actor'],
                 "endpoints": data['endpoints'],
                 "components": data['members'] + data.get('nested_cpps', [])
             }
