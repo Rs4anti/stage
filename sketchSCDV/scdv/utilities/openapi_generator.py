@@ -1,15 +1,27 @@
 class OpenAPIGenerator:
     @staticmethod
     def generate_atomic_openapi(data):
-        # Prepara schema input/output
+        type_mapping = {
+            'string': 'string',
+            'integer': 'integer',
+            'float': 'number',
+            'boolean': 'boolean'
+        }
+
         input_schema = {
-            k: {"type": v}
-            for k, v in data.get("input", {}).items()
+            f"input_{i+1}": {
+                "type": type_mapping.get(param_type, "string"),
+                "example": param_value
+            }
+            for i, (param_value, param_type) in enumerate(data.get("input", {}).items())
         }
 
         output_schema = {
-            k: {"type": v}
-            for k, v in data.get("output", {}).items()
+            f"output_{i+1}": {
+                "type": type_mapping.get(param_type, "string"),
+                "example": param_value
+            }
+            for i, (param_value, param_type) in enumerate(data.get("output", {}).items())
         }
 
         return {

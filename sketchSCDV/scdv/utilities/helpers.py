@@ -17,7 +17,7 @@ def detect_type(value):
             pass
         try:
             float(val)
-            return 'float'
+            return 'number'
         except ValueError:
             pass
         return 'string'
