@@ -3,7 +3,8 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from django.views.decorators.csrf import csrf_exempt
-from utilities.mongodb_handler import atomic_services_collection, cpps_collection, cppn_collection, bpmn_collection, openapi_collection, MongoDBHandler
+from utilities.mongodb_handler import atomic_services_collection, cpps_collection, cppn_collection, bpmn_collection, MongoDBHandler
+from utilities.openapi_generator import OpenAPIGenerator
 from django.utils.timezone import now
 from drf_spectacular.utils import extend_schema_view, extend_schema, OpenApiResponse
 from rest_framework.views import APIView
@@ -96,15 +97,27 @@ def parse_param_list(param_list):
 def save_atomic_service(request):
     data = request.data
     print("===Atomic Payload received:", data)
+    
     result, status_code = MongoDBHandler.save_atomic(data)
-    return Response(result, status=status_code)
+    
+    if status_code in [200, 201]:
+        openapi_doc = OpenAPIGenerator.generate_atomic_openapi(data)
+        
+        doc_result, doc_status = MongoDBHandler.save_openapi_documentation(openapi_doc)
+        print("===OpenAPI doc saved:", doc_result)
+    else:
+        doc_result, doc_status = {"message": "Atomic service not saved, skipping OpenAPI"}, 400
+    
+    return Response({
+        "atomic_service": result,
+        "openapi_documentation": doc_result
+    }, status=status_code)
     
 @api_view(['POST'])
 def save_cppn_service(request):
      data = request.data
      print("===CPPN Payload received:", data)
      result, status_code = MongoDBHandler.save_cppn(data)
-
      return Response(result, status=status_code)
 
 @api_view(['POST'])

@@ -209,3 +209,8 @@ class MongoDBHandler:
 
         except Exception as e:
             return {'error': str(e)}, 500
+        
+    @staticmethod
+    def save_openapi_documentation(openapi_doc):
+        openapi_collection.insert_one(openapi_doc)
+        return {"message": "OpenAPI documentation saved"}, 201

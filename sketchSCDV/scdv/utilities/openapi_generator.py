@@ -6,8 +6,8 @@ class OpenAPIGenerator:
             "info": {
                 "title": data["name"],
                 "version": "1.0.0",
-                "x-service-type": "atomic",
                 "x-owner": data["owner"],
+                "x-service-type": "atomic",        # custom estensione            
                 "x-atomic-type": data["atomic_type"]
             },
             "paths": {
@@ -20,8 +20,15 @@ class OpenAPIGenerator:
                                 "application/json": {
                                     "schema": {
                                         "type": "object",
-                                        "input": {k: {"type": "string"} for k in data["input_params"]},
-                                        "required": data["input_params"]
+                                        "properties": {
+                                            "input": {
+                                                "type": "array",
+                                                "items": {"type": "string"},
+                                                "description": "List of input parameters",
+                                                "example": data["input_params"]
+                                            }
+                                        },
+                                        "required": ["input"]
                                     }
                                 }
                             }
@@ -33,7 +40,14 @@ class OpenAPIGenerator:
                                     "application/json": {
                                         "schema": {
                                             "type": "object",
-                                            "output": {k: {"type": "string"} for k in data["output_params"]}
+                                            "properties": {
+                                                "output": {
+                                                    "type": "array",
+                                                    "items": {"type": "string"},
+                                                    "description": "List of output parameters",
+                                                    "example": data["output_params"]
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -43,6 +57,7 @@ class OpenAPIGenerator:
                 }
             }
         }
+
 
     @staticmethod
     def generate_cpps_openapi(data, atomic_services):

@@ -1,7 +1,7 @@
 import random
 import string
-from bson import ObjectId
-from mongodb_handler import atomic_services_collection
+import requests
+from datetime import datetime
 
 # Funzioni helper
 def random_string(length=6):
@@ -16,13 +16,56 @@ def random_float():
 def random_int():
     return str(random.randint(1, 100))
 
-# Seeder loop
+API_BASE = 'http://localhost:8000/editor/api'
+
+# Template minimo XML
+BLANK_XML = '''<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  id="Definitions_1"
+                  targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="Process_{id}" isExecutable="false">
+  </bpmn:process>
+</bpmn:definitions>'''
+
+# Step 1: crea 3 diagrammi vuoti
+diagram_ids = []
+
+for i in range(3):
+    diagram_name = f"Test Diagram {datetime.utcnow().isoformat()}"
+    diagram_payload = {
+        "name": diagram_name,
+        "xml_content": BLANK_XML.format(id=random_string(6)),
+    }
+
+    try:
+        response = requests.post(f"{API_BASE}/save-diagram/", json=diagram_payload)
+        if response.status_code in [200, 201]:
+            diagram_data = response.json()
+            diagram_id = diagram_data.get('_id') or diagram_data.get('id')
+            if diagram_id:
+                diagram_ids.append(diagram_id)
+                print(f"✅ Diagramma creato: {diagram_id}")
+            else:
+                print(f"⚠️ Nessun ID restituito per diagramma {i}")
+        else:
+            print(f"❌ Errore creando diagramma {i}: {response.status_code} - {response.text}")
+    except Exception as e:
+        print(f"❌ Errore connessione API diagrammi: {e}")
+
+if not diagram_ids:
+    print("❌ Nessun diagramma creato, fermo il seeder.")
+    exit(1)
+
+# Step 2: genera atomic services random e assegnali ai diagrammi
 for i in range(30):
-    doc = {
+    payload = {
         'task_id': f'Activity_{random_string(8)}',
         'atomic_type': random.choice(['collect', 'process&monitor', 'dispatch', 'display']),
-        'diagram_id': str(ObjectId()),
-        'input': [
+        'diagram_id': random.choice(diagram_ids),
+        'input_params': [
             random_string(),
             random_bool(),
             random_int(),
@@ -30,7 +73,7 @@ for i in range(30):
         ],
         'method': random.choice(['GET', 'POST', 'PUT', 'DELETE']),
         'name': f'as_{i}',
-        'output': [
+        'output_params': [
             random_string(),
             random_bool(),
             random_int()
@@ -39,6 +82,13 @@ for i in range(30):
         'url': f'/url{i}'
     }
 
-    atomic_services_collection.insert_one(doc)
+    try:
+        response = requests.post(f"{API_BASE}/save-atomic-service/", json=payload)
+        if response.status_code in [200, 201]:
+            print(f"✅ [OK] Atomic service {i} salvato.")
+        else:
+            print(f"⚠️ [WARN] Atomic service {i} non salvato. Status: {response.status_code}, Message: {response.text}")
+    except Exception as e:
+        print(f"❌ [ERROR] Errore salvando atomic service {i}: {e}")
 
-print("✅ Inseriti 30 documenti di test in 'atomic_services'")
+print("🏁 Seeder completato.")
