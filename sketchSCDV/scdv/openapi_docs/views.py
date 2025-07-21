@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from utilities.mongodb_handler import atomic_services_collection, cpps_collection, cppn_collection
+from utilities.mongodb_handler import atomic_services_collection, cpps_collection, cppn_collection, openapi_collection
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.http import JsonResponse
@@ -8,14 +8,36 @@ from rest_framework.decorators import api_view
 def openapi_docs_page(request):
     return render(request, 'openapi_docs/openapi_docs.html')
 
+from bson import ObjectId
+
 def atomic_docs_page(request):
-    services = list(atomic_services_collection.find())
+    services = list(openapi_collection.find({"info.x-service-type": "atomic"}))
     base_url = request.build_absolute_uri('/').rstrip('/')
+    filtered_services = []
 
     for s in services:
-        s['schema_url'] = f"{base_url}/openapi_docs/schema/atomic/{s['task_id']}/"
+        # Prendi _id come stringa
+        mongo_id = str(s.get('_id'))
+        
+        # Prendi primo path e metodo
+        paths = s.get('paths', {})
+        if not paths:
+            continue  # Skippa se mancano
 
-    return render(request, 'openapi_docs/atomic_docs.html', {'services': services})
+        path, methods = next(iter(paths.items()))
+        method = next(iter(methods.keys())).upper()  # es. DELETE
+
+        # Popola campi per il template
+        s['task_id'] = mongo_id  # ATTENZIONE: ora è l'ObjectId, non più info.title
+        s['name'] = s.get('info', {}).get('title', 'unnamed')
+        s['url'] = path
+        s['method'] = method
+        s['schema_url'] = f"{base_url}/openapi_docs/schema/atomic/{mongo_id}/"
+
+        filtered_services.append(s)
+
+    return render(request, 'openapi_docs/atomic_docs.html', {'services': filtered_services})
+
 
 def swagger_viewer(request, task_id):
     base_url = request.build_absolute_uri('/').rstrip('/')
@@ -85,61 +107,22 @@ class AtomicServiceSchemaView(APIView):
     
 
 
+from bson import ObjectId
+
 @api_view(['GET'])
 def atomic_service_schema(request, task_id):
-    atomic = atomic_services_collection.find_one({'task_id': task_id})
-    if not atomic:
+    try:
+        object_id = ObjectId(task_id)
+    except Exception:
+        return JsonResponse({'error': 'Invalid ID'}, status=400)
+
+    atomic_doc = openapi_collection.find_one({'_id': object_id})
+    if not atomic_doc:
         return JsonResponse({'error': 'Atomic service not found'}, status=404)
 
-    schema = {
-        'openapi': '3.1.0',
-        'info': {
-            'title': f"Atomic Service: {atomic.get('name', task_id)}",
-            'version': '1.0.0',
-            'x-atomic-type': atomic.get('atomic_type', ''),
-            "x-owner": atomic.get("owner", "unknown"),
-            'x-atomic-name': atomic.get('name', task_id),
-        },
-        'paths': {
-            atomic['url']: {
-                atomic.get('method', 'POST').lower(): {
-                    'summary': f"{atomic.get('atomic_type', 'atomic')} service",
-                    'requestBody': {
-                        'required': True,
-                            'content': {
-                                'application/json': {
-                                    'schema': {
-                                        'type': 'object',
-                                        'properties': {
-                                            k: {'type': 'string'} for k in atomic.get('input_params', [])
-                                        },
-                                        'required': atomic.get('input_params', [])
-                                    }
-                                }
-                            }
-                        },
-                        'responses': {
-                            '200': {
-                                'description': 'Success',
-                                'content': {
-                                    'application/json': {
-                                        'schema': {
-                                            'type': 'object',
-                                            'properties': {
-                                                k: {'type': 'string'} for k in atomic.get('output_params', [])
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        'tags': ['atomic']
-                    }
-                }
-            }
-        }
+    atomic_doc.pop('_id', None)
+    return JsonResponse(atomic_doc)
 
-    return JsonResponse(schema)
 
 
 def cpps_docs_page(request):

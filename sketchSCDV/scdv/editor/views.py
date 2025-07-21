@@ -12,7 +12,6 @@ from rest_framework.response import Response
 from django.http import JsonResponse
 from bson import ObjectId, json_util
 from bson.errors import InvalidId
-from utilities.mongodb_dataframe_builder import AtomicServiceDataFrameBuilder
 
 def data_view_editor(request):
     return render(request, 'editor/view.html')
@@ -92,22 +91,35 @@ def parse_param_list(param_list):
         parsed.append({'name': item, 'type': type_})
     return parsed
 
-
+from utilities.helpers import detect_type
 @api_view(['POST'])
 def save_atomic_service(request):
     data = request.data
     print("===Atomic Payload received:", data)
-    
+
+    # Genera input/output tipizzati
+    input_dict = {
+        str(v): detect_type(v)
+        for v in data.get('input_params', [])
+    }
+    output_dict = {
+        str(v): detect_type(v)
+        for v in data.get('output_params', [])
+    }
+
+    # Aggiorna il payload con input/output già pronti
+    data['input'] = input_dict
+    data['output'] = output_dict
+
     result, status_code = MongoDBHandler.save_atomic(data)
-    
+
     if status_code in [200, 201]:
         openapi_doc = OpenAPIGenerator.generate_atomic_openapi(data)
-        
         doc_result, doc_status = MongoDBHandler.save_openapi_documentation(openapi_doc)
         print("===OpenAPI doc saved:", doc_result)
     else:
         doc_result, doc_status = {"message": "Atomic service not saved, skipping OpenAPI"}, 400
-    
+
     return Response({
         "atomic_service": result,
         "openapi_documentation": doc_result

@@ -4,62 +4,55 @@ class AtomicServiceDataFrameBuilder:
 
     @staticmethod
     def from_document(doc):
-        # Overview dataframe
-        overview_data = {
-            'task_id': [doc['task_id']],
-            'diagram_id': [doc['diagram_id']],
-            'name': [doc['name']],
-            'atomic_type': [doc['atomic_type']],
-            'method': [doc['method']],
-            'url': [doc['url']],
-            'owner': [doc['owner']]
-        }
-        overview_df = pd.DataFrame(overview_data)
+        rows = []
 
-        # Function to detect type
-        def detect_type(value):
-            if isinstance(value, bool):
-                return 'bool'
-            if isinstance(value, int):
-                return 'int'
-            if isinstance(value, float):
-                return 'float'
-            if isinstance(value, str):
-                val = value.strip()
-                if val.lower() in ['true', 'false']:
-                    return 'bool'
-                try:
-                    int(val)
-                    return 'int'
-                except ValueError:
-                    pass
-                try:
-                    float(val)
-                    return 'float'
-                except ValueError:
-                    pass
-                return 'string'
-            return 'unknown'
-
-        # Parameters dataframe
-        params_rows = []
-
-        for param in doc.get('input', []):
-            params_rows.append({
+        for param_name, param_type in doc.get('input', {}).items():
+            rows.append({
                 'task_id': doc['task_id'],
-                'param_name': param,
-                'param_type': detect_type(param),
+                'diagram_id': doc['diagram_id'],
+                'name': doc['name'],
+                'atomic_type': doc['atomic_type'],
+                'method': doc['method'],
+                'url': doc['url'],
+                'owner': doc['owner'],
+                'param_name': param_name,
+                'param_type': param_type,
                 'io_type': 'input'
             })
 
-        for param in doc.get('output', []):
-            params_rows.append({
+        for param_name, param_type in doc.get('output', {}).items():
+            rows.append({
                 'task_id': doc['task_id'],
-                'param_name': param,
-                'param_type': detect_type(param),
+                'diagram_id': doc['diagram_id'],
+                'name': doc['name'],
+                'atomic_type': doc['atomic_type'],
+                'method': doc['method'],
+                'url': doc['url'],
+                'owner': doc['owner'],
+                'param_name': param_name,
+                'param_type': param_type,
                 'io_type': 'output'
             })
 
-        params_df = pd.DataFrame(params_rows)
+        df = pd.DataFrame(rows)
 
-        return overview_df, params_df
+        # Separate input and output
+        input_rows = df[df['io_type'] == 'input'][['param_name', 'param_type']].reset_index(drop=True)
+        output_rows = df[df['io_type'] == 'output'][['param_name', 'param_type']].reset_index(drop=True)
+
+        # Overview data (single row)
+        overview = df[['task_id', 'diagram_id', 'name', 'atomic_type', 'method', 'url', 'owner']].iloc[0].to_dict()
+
+        # Build wide format row
+        wide_row = {**overview}
+        for idx, row in input_rows.iterrows():
+            wide_row[f'input_{idx+1}'] = row['param_name']
+            wide_row[f'input_{idx+1}_type'] = row['param_type']
+        for idx, row in output_rows.iterrows():
+            wide_row[f'output_{idx+1}'] = row['param_name']
+            wide_row[f'output_{idx+1}_type'] = row['param_type']
+
+        # Create final DataFrame
+        wide_df = pd.DataFrame([wide_row])
+
+        return wide_df
