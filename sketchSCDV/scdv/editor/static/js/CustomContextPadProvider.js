@@ -125,7 +125,8 @@ function CustomContextPadProvider(config, contextPad, modeling, translate) {
               });
 
           } else {
-            console.warn('Tipo elemento non gestito:', element.type);
+             // per tutti gli altri, usa il default
+            modeling.removeElements([element]);
           }
         }
       }
