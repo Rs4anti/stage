@@ -8,23 +8,23 @@ def random_string(length=6):
     return ''.join(random.choices(string.ascii_lowercase, k=length))
 
 def random_bool():
-    return str(random.choice([True, False]))
+    return random.choice([True, False])
 
 def random_float():
-    return str(round(random.uniform(1, 100), 2))
+    return round(random.uniform(1, 100), 2)
 
 def random_int():
-    return str(random.randint(1, 100))
+    return random.randint(1, 100)
 
 API_BASE = 'http://localhost:8000/editor/api'
 
-# Template minimo XML
+# Template minimo XML per diagramma vuoto
 BLANK_XML = '''<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                   xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
                   xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
                   xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
-                  id="Definitions_1"
+                  id="Definitions_{id}"
                   targetNamespace="http://bpmn.io/schema/bpmn">
   <bpmn:process id="Process_{id}" isExecutable="false">
   </bpmn:process>
@@ -59,27 +59,30 @@ if not diagram_ids:
     print("❌ Nessun diagramma creato, fermo il seeder.")
     exit(1)
 
-# Step 2: genera atomic services random e assegnali ai diagrammi
-for i in range(30):
+# Step 2: genera 20 atomic services random e assegnali ai diagrammi
+for i in range(20):
+    input_params = [
+        random_string(),
+        random_bool(),
+        random_int(),
+        random_float()
+    ]
+    output_params = [
+        random_string(),
+        random_bool(),
+        random_int()
+    ]
+
     payload = {
         'task_id': f'Activity_{random_string(8)}',
         'atomic_type': random.choice(['collect', 'process&monitor', 'dispatch', 'display']),
         'diagram_id': random.choice(diagram_ids),
-        'input_params': [
-            random_string(),
-            random_bool(),
-            random_int(),
-            random_float()
-        ],
+        'input_params': [str(v) for v in input_params],
+        'output_params': [str(v) for v in output_params],
         'method': random.choice(['GET', 'POST', 'PUT', 'DELETE']),
         'name': f'as_{i}',
-        'output_params': [
-            random_string(),
-            random_bool(),
-            random_int()
-        ],
-        'owner': random.choice(['paolo', 'maria', 'giulia', 'luca']),
-        'url': f'/url{i}'
+        'url': f'/url{i}',
+        'owner': random.choice(['paolo', 'maria', 'giulia', 'luca'])
     }
 
     try:

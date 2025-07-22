@@ -66,3 +66,114 @@ class OpenAPIGenerator:
                 }
             }
         }
+
+
+    @staticmethod
+    def generate_cpps_openapi(doc, atomic_map, cpps_map):
+        """
+        doc: documento CPPS da cpps_collection
+        atomic_map: dict {task_id: atomic_doc} dei componenti atomic
+        cpps_map: dict {group_id: cpps_doc} dei componenti nested cpps
+        """
+
+        components_names = []
+
+        for comp_id in doc.get("components", []):
+            if comp_id in atomic_map:
+                components_names.append(atomic_map[comp_id].get("name", comp_id))
+            elif comp_id in cpps_map:
+                components_names.append(cpps_map[comp_id].get("name", comp_id))
+
+        # Costruzione paths
+        paths = {}
+        for idx, ep in enumerate(doc.get("endpoints", [])):
+            path = ep.get("url")
+            method = ep.get("method", "POST").lower()
+
+            paths.setdefault(path, {})[method] = {
+                "summary": doc.get("description", "CPPS composite service"),
+                "responses": {
+                    "200": {
+                        "description": doc.get('description', "Execution successful")
+                    }
+                }
+            }
+
+        # Schema finale
+        schema = {
+            "openapi": "3.1.0",
+            "info": {
+                "title": f"CPPS Service: {doc.get('name', doc.get('group_id'))}",
+                "version": "1.0.0",
+                "description": doc.get('description', ''),
+                "x-owner": doc.get("actor", ''),
+                "x-service-type": "cpps",
+                "x-cpps-name": doc.get("name", ''),
+                "x-components": components_names,
+                "x-workflow": doc.get("workflow_type", "sequence")
+            },
+            "paths": paths,
+        }
+
+        return schema
+    
+
+    @staticmethod
+    def generate_cppn_openapi(doc, atomic_map, cpps_map):
+        """
+        doc: documento CPPN da cppn_collection
+        atomic_map: dict {task_id: atomic_doc} dei componenti atomic
+        cpps_map: dict {group_id: cpps_doc} dei componenti cpps
+        """
+
+        components_names = []
+        for comp_id in doc.get("components", []):
+            if comp_id in atomic_map:
+                components_names.append(atomic_map[comp_id].get("name", comp_id))
+            elif comp_id in cpps_map:
+                components_names.append(cpps_map[comp_id].get("name", comp_id))
+
+        # Costruzione paths: fallback se vuoto
+        paths = {}
+        if doc.get("endpoints"):
+            for ep in doc["endpoints"]:
+                path = ep.get("url")
+                method = ep.get("method", "POST").lower()
+                paths.setdefault(path, {})[method] = {
+                    "summary": doc.get("description", "CPPN composite service"),
+                    "responses": {
+                        "200": {
+                            "description": doc.get('description', "Execution successful")
+                        }
+                    }
+                }
+        else:
+            paths["/cppn/execute"] = {
+                "post": {
+                    "summary": f"Execute {doc.get('name', doc.get('group_id'))} network",
+                    "responses": {
+                        "200": {
+                            "description": "Execution successful"
+                        }
+                    }
+                }
+            }
+
+        # Schema finale
+        schema = {
+            "openapi": "3.1.0",
+            "info": {
+                "title": f"CPPN Service: {doc.get('name', doc.get('group_id'))}",
+                "version": "1.0.0",
+                "description": doc.get('description', ''),
+                "x-actors": doc.get("actors", []),
+                "x-cppn-name": doc.get("name", ''),
+                "x-service-type": "cppn",
+                "x-components": components_names,
+                "x-gdpr-map": doc.get("gdpr_map", {}),
+                "x-workflow": doc.get("workflow_type", "sequence")
+            },
+            "paths": paths
+        }
+
+        return schema

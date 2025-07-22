@@ -29,9 +29,15 @@ function openAtomicServiceForm(element, isNew = false) {
       outputParams = customExt.outputParams || '';
       method = customExt.method || '';
       url = customExt.url || '';
-      owner = customExt.owner || 'LETTO MALE';
+      owner = customExt.owner || '';
     }
   }
+
+  // 👉 QUI inserisci il fallback automatico
+    if (!owner) {
+      owner = detectParticipantForElement(element);
+    }
+
 
   document.getElementById('serviceName').value = bo.name || '';
   document.getElementById('atomicType').value = atomicType;
@@ -83,6 +89,29 @@ function showToast(message) {
   const toast = new bootstrap.Toast(toastEl);
   toast.show();
 }
+
+
+function detectParticipantForElement(element) {
+  const elementRegistry = bpmnModeler.get('elementRegistry');
+  const canvas = bpmnModeler.get('canvas');
+
+  const elementBBox = canvas.getAbsoluteBBox(element);
+
+  const participants = elementRegistry.filter(el => el.type === 'bpmn:Participant');
+
+  const containing = participants.find(part => {
+    const partBBox = canvas.getAbsoluteBBox(part);
+    return (
+      elementBBox.x >= partBBox.x &&
+      elementBBox.x + elementBBox.width <= partBBox.x + partBBox.width &&
+      elementBBox.y >= partBBox.y &&
+      elementBBox.y + elementBBox.height <= partBBox.y + partBBox.height
+    );
+  });
+
+  return containing ? (containing.businessObject.name || '') : '';
+}
+
 
 // Esponi globalmente
 window.openAtomicServiceForm = openAtomicServiceForm;

@@ -132,10 +132,6 @@ modalInstance.show();
 
 }
 
-
-
-
-
 function addEndpointRow(method = '', url = '') {
   const container = document.getElementById('endpointsContainer');
   const div = document.createElement('div');
@@ -223,7 +219,7 @@ function detectGroupParticipants(groupElement) {
 
 
 function getParticipantName(element) {
-  return element.businessObject.name || '(nessun nome)';
+  return element.businessObject.name || '(no name)';
 }
 
 

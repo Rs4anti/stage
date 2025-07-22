@@ -12,6 +12,7 @@ from rest_framework.response import Response
 from django.http import JsonResponse
 from bson import ObjectId, json_util
 from bson.errors import InvalidId
+from utilities.helpers import detect_type
 
 def data_view_editor(request):
     return render(request, 'editor/view.html')
@@ -91,7 +92,6 @@ def parse_param_list(param_list):
         parsed.append({'name': item, 'type': type_})
     return parsed
 
-from utilities.helpers import detect_type
 @api_view(['POST'])
 def save_atomic_service(request):
     data = request.data
@@ -124,21 +124,87 @@ def save_atomic_service(request):
         "atomic_service": result,
         "openapi_documentation": doc_result
     }, status=status_code)
-    
-@api_view(['POST'])
-def save_cppn_service(request):
-     data = request.data
-     print("===CPPN Payload received:", data)
-     result, status_code = MongoDBHandler.save_cppn(data)
-     return Response(result, status=status_code)
 
 @api_view(['POST'])
 def save_cpps_service(request):
     data = request.data
     print("===CPPS Payload received:", data)
+
     result, status_code = MongoDBHandler.save_cpps(data)
 
-    return Response(result, status=status_code)
+    if status_code in [200, 201]:
+        # Recupera i documenti atomic e cpps referenziati nei components
+        components = data.get('components', [])
+
+        atomic_map = {
+            a["task_id"]: a
+            for a in atomic_services_collection.find({"task_id": {"$in": components}})
+        }
+
+        cpps_map = {
+            c["group_id"]: c
+            for c in cpps_collection.find({"group_id": {"$in": components}})
+        }
+
+        # Genera documentazione OpenAPI per il CPPS
+        openapi_doc = OpenAPIGenerator.generate_cpps_openapi(data, atomic_map, cpps_map)
+
+        # Salva documentazione OpenAPI nella collection openapi
+        doc_result, doc_status = MongoDBHandler.save_openapi_documentation(openapi_doc)
+        print("===OpenAPI doc saved:", doc_result)
+    else:
+        doc_result, doc_status = {"message": "CPPS not saved, skipping OpenAPI"}, 400
+
+    return Response({
+        "cpps_service": result,
+        "openapi_documentation": doc_result
+    }, status=status_code)
+
+
+
+@api_view(['POST'])
+def save_cppn_service(request):
+    data = request.data
+    print("===CPPN Payload received:", data)
+
+    # Salva CPPN nel database
+    result, status_code = MongoDBHandler.save_cppn(data)
+
+    if status_code in [200, 201]:
+        # Recupera documento appena salvato
+        saved_doc = cppn_collection.find_one({'group_id': data['group_id']})
+
+        if not saved_doc:
+            print("❌ CPPN not found after save")
+            return Response({"error": "CPPN saved but not found for OpenAPI generation"}, status=500)
+
+        # Recupera i componenti (atomic e cpps)
+        components = saved_doc.get('components', [])
+
+        atomic_map = {
+            a["task_id"]: a
+            for a in atomic_services_collection.find({"task_id": {"$in": components}})
+        }
+
+        cpps_map = {
+            c["group_id"]: c
+            for c in cpps_collection.find({"group_id": {"$in": components}})
+        }
+
+        # Genera documentazione OpenAPI per il CPPN
+        openapi_doc = OpenAPIGenerator.generate_cppn_openapi(saved_doc, atomic_map, cpps_map)
+
+        # Salva documentazione OpenAPI nella collection openapi
+        doc_result, doc_status = MongoDBHandler.save_openapi_documentation(openapi_doc)
+        print("===OpenAPI doc saved:", doc_result)
+    else:
+        doc_result, doc_status = {"message": "CPPN not saved, skipping OpenAPI"}, 400
+
+    return Response({
+        "cppn_service": result,
+        "openapi_documentation": doc_result
+    }, status=status_code)
+
 
 @api_view(['GET'])
 def get_cppn_service(request, group_id):
