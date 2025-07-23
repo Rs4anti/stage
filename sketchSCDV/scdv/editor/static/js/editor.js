@@ -256,11 +256,13 @@ function renderAtomicDetails(section, data) {
   const wrapper = document.createElement('div');
   wrapper.className = 'atomic-details-wrapper';
 
+  // Titolo
   const title = document.createElement('h5');
   title.className = 'mb-3 fw-bold';
   title.textContent = 'Details: Atomic Service';
   wrapper.appendChild(title);
 
+  // Informazioni di base
   const nameP = document.createElement('p');
   nameP.innerHTML = `<strong>Atomic service name:</strong> ${data.name || '-'}`;
   wrapper.appendChild(nameP);
@@ -269,37 +271,39 @@ function renderAtomicDetails(section, data) {
   ownerP.innerHTML = `<strong>Owner:</strong> ${data.owner || '-'}`;
   wrapper.appendChild(ownerP);
 
-
+  // Griglia input / output / metadata
   const row = document.createElement('div');
   row.className = 'd-flex justify-content-between gap-5 flex-wrap';
 
-  // Input column
+  // Input
   const inputCol = document.createElement('div');
   const inputTitle = document.createElement('h6');
   inputTitle.textContent = 'Input:';
   inputCol.appendChild(inputTitle);
   const inputList = document.createElement('ul');
-  (data.input_params || []).forEach(i => {
+  const inputs = data.input || {};
+  for (const [param, type] of Object.entries(inputs)) {
     const li = document.createElement('li');
-    li.textContent = `- ${i}`;
+    li.textContent = `${param}: ${type}`;
     inputList.appendChild(li);
-  });
+  }
   inputCol.appendChild(inputList);
 
-  // Output column
+  // Output
   const outputCol = document.createElement('div');
   const outputTitle = document.createElement('h6');
   outputTitle.textContent = 'Output:';
   outputCol.appendChild(outputTitle);
   const outputList = document.createElement('ul');
-  (data.output_params || []).forEach(o => {
+  const outputs = data.output || {};
+  for (const [param, type] of Object.entries(outputs)) {
     const li = document.createElement('li');
-    li.textContent = `- ${o}`;
+    li.textContent = `${param}: ${type}`;
     outputList.appendChild(li);
-  });
+  }
   outputCol.appendChild(outputList);
 
-  // Meta column
+  // Meta
   const metaCol = document.createElement('div');
   const metaList = document.createElement('ul');
   ['atomic_type', 'url', 'method'].forEach(k => {
@@ -311,13 +315,13 @@ function renderAtomicDetails(section, data) {
   });
   metaCol.appendChild(metaList);
 
-  // Append columns to row
+  // Monta tutto
   row.appendChild(inputCol);
   row.appendChild(outputCol);
   row.appendChild(metaCol);
-
   wrapper.appendChild(row);
-  section.innerHTML = '';
+
+  section.innerHTML = '';  // Svuota la sezione
   section.appendChild(wrapper);
 }
 
