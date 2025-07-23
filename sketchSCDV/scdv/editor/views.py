@@ -151,17 +151,17 @@ def save_cpps_service(request):
 
 
         # Genera documentazione OpenAPI per il CPPS
-       # openapi_doc = OpenAPIGenerator.generate_cpps_openapi(data, atomic_map, cpps_map)
+        openapi_doc = OpenAPIGenerator.generate_cpps_openapi(data, atomic_map, cpps_map)
 
         # Salva documentazione OpenAPI nella collection openapi
-        #doc_result, doc_status = MongoDBHandler.save_openapi_documentation(openapi_doc)
-        #print("===OpenAPI doc saved:", doc_result)
+        doc_result, doc_status = MongoDBHandler.save_openapi_documentation(openapi_doc)
+        print("===OpenAPI doc saved:", doc_result)
     else:
         doc_result, doc_status = {"message": "CPPS not saved, skipping OpenAPI"}, 400
 
     return Response({
         "cpps_service": result,
-       # "openapi_documentation": doc_result
+        "openapi_documentation": doc_result
     }, status=status_code)
 
 
