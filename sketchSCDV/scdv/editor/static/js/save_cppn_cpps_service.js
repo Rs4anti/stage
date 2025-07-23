@@ -38,9 +38,9 @@ async function saveCompositeService() {
     return { method, url };
   });
 
-  const {atomicMembers, nestedCPPS} = detectGroupMembers(currentElement);
-  console.log("Atomic members:", atomicMembers);
-  console.log("Nested cpps:", nestedCPPS);
+  const { components } = detectGroupMembers(currentElement);
+  console.log("Detected components:", components);
+
 
   if (!name) {
     alert("Composite service's name is mandatory!");
@@ -76,8 +76,7 @@ async function saveCompositeService() {
     name,
     description,
     workflow_type: workflowType,
-    members: atomicMembers,
-    nested_cpps : nestedCPPS,
+    components,
   };
 
   try {
@@ -99,36 +98,6 @@ async function saveCompositeService() {
   } catch (err) {
     console.error(`Error saving ${groupType}:`, err);
     alert(`Error saving ${groupType}: ${err.message}`);
-  }
-
-    // Se sto salvando un CPPS, verifico se è annidato in un altro CPPS
-  if (groupType === 'CPPS') {
-    const parentGroup = findParentGroup(currentElement);
-    if (parentGroup) {
-      console.log("Il gruppo è annidato dentro:", parentGroup.id);
-
-      const csrftoken = getCookie('csrftoken');
-
-      try {
-        const res = await fetch(`/editor/api/add-nested-cpps/${parentGroup.id}/`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': csrftoken
-          },
-          body: JSON.stringify({ nested_id: currentElement.id })
-        });
-
-        const resJson = await res.json();
-        if (res.ok) {
-          console.log("✅ nested_cpps aggiornato per", parentGroup.id);
-        } else {
-          console.warn("❌ Errore aggiornamento nested_cpps:", resJson.error);
-        }
-      } catch (err) {
-        console.error("❌ Errore fetch nested_cpps:", err.message);
-      }
-    }
   }
 
   bootstrap.Modal.getInstance(document.getElementById('groupTypeModal')).hide();
@@ -191,48 +160,66 @@ function detectGroupMembers(groupElement) {
   const canvas = bpmnModeler.get('canvas');
   const groupBBox = canvas.getAbsoluteBBox(groupElement);
 
-  // Funzione: inclusione stretta
   const isStrictlyInside = (inner, outer) =>
     inner.x >= outer.x &&
     inner.y >= outer.y &&
     inner.x + inner.width <= outer.x + outer.width &&
     inner.y + inner.height <= outer.y + outer.height;
 
-  // Recupera i task
+  // === COMPONENTI ===
+  const components = [];
+
+  // 1. Atomic services (task-like)
   const taskLike = elementRegistry.filter(el =>
-    el.type === 'bpmn:Task' ||
-    el.type === 'bpmn:SubProcess' ||
-    el.type === 'bpmn:CallActivity'
+    ['bpmn:Task', 'bpmn:CallActivity', 'bpmn:SubProcess'].includes(el.type)
   );
 
-  // Recupera i gruppi annidati
+  taskLike.forEach(el => {
+    const bbox = canvas.getAbsoluteBBox(el);
+    if (isStrictlyInside(bbox, groupBBox)) {
+      components.push({
+        id: el.id,
+        type: 'Atomic'
+      });
+    }
+  });
+
+  // 2. Gateway
+  const gatewayTypes = ['bpmn:ParallelGateway', 'bpmn:ExclusiveGateway', 'bpmn:InclusiveGateway'];
+  const gateways = elementRegistry.filter(el => gatewayTypes.includes(el.type));
+
+  gateways.forEach(gw => {
+    const gwBox = canvas.getAbsoluteBBox(gw);
+    if (!isStrictlyInside(gwBox, groupBBox)) return;
+
+    const outgoingTargets = (gw.outgoing || [])
+      .map(flow => flow.target?.id)
+      .filter(Boolean);
+
+    components.push({
+      id: gw.id,
+      type: gw.type.replace('bpmn:', ''),
+      targets: outgoingTargets
+    });
+  });
+
+  // 3. Gruppi annidati (altri CPPS)
   const allGroups = elementRegistry.filter(el => el.type === 'bpmn:Group');
   const nestedCPPS = allGroups
-    .filter(el => el.id !== groupElement.id && isStrictlyInside(canvas.getAbsoluteBBox(el), groupBBox));
-
-  const nestedBBoxes = nestedCPPS.map(el => canvas.getAbsoluteBBox(el));
-
-  const atomicMembers = taskLike
-    .filter(el => {
-      const elBBox = canvas.getAbsoluteBBox(el);
-
-      // Deve essere completamente dentro il group principale
-      if (!isStrictlyInside(elBBox, groupBBox)) return false;
-
-      // NON deve essere dentro uno dei gruppi annidati
-      for (const nestedBBox of nestedBBoxes) {
-        if (isStrictlyInside(elBBox, nestedBBox)) return false;
-      }
-
-      return true;
-    })
+    .filter(el => el.id !== groupElement.id && isStrictlyInside(canvas.getAbsoluteBBox(el), groupBBox))
     .map(el => el.id);
 
-  return {
-    atomicMembers,
-    nestedCPPS: nestedCPPS.map(el => el.id)
-  };
+  const nestedComponents = nestedCPPS.map(el => ({
+  id: el.id,
+  type: 'CPPS'
+}));
+
+  
+return {
+  components: [...components, ...nestedComponents]
+};
 }
+
 
 
 function findParentGroup(innerGroup) {

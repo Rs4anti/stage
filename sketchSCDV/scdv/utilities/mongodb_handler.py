@@ -165,7 +165,7 @@ class MongoDBHandler:
             'name',
             'description',
             'workflow_type',
-            'members',
+            'components',
             'actor',
             'endpoints'
         ]
@@ -193,7 +193,7 @@ class MongoDBHandler:
                 "workflow_type": data['workflow_type'],
                 "owner": data['actor'],
                 "endpoints": data['endpoints'],
-                "components": data['members'] + data.get('nested_cpps', [])
+                "components": data['components']
             }
 
             result = cpps_collection.update_one(

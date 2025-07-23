@@ -136,28 +136,32 @@ def save_cpps_service(request):
         # Recupera i documenti atomic e cpps referenziati nei components
         components = data.get('components', [])
 
+        component_ids = [c['id'] for c in components if c['type'] == 'Atomic']
+        cpps_ids = [c['id'] for c in components if c['type'] == 'CPPS']
+
         atomic_map = {
             a["task_id"]: a
-            for a in atomic_services_collection.find({"task_id": {"$in": components}})
+            for a in atomic_services_collection.find({"task_id": {"$in": component_ids}})
         }
 
         cpps_map = {
             c["group_id"]: c
-            for c in cpps_collection.find({"group_id": {"$in": components}})
+            for c in cpps_collection.find({"group_id": {"$in": cpps_ids}})
         }
 
+
         # Genera documentazione OpenAPI per il CPPS
-        openapi_doc = OpenAPIGenerator.generate_cpps_openapi(data, atomic_map, cpps_map)
+       # openapi_doc = OpenAPIGenerator.generate_cpps_openapi(data, atomic_map, cpps_map)
 
         # Salva documentazione OpenAPI nella collection openapi
-        doc_result, doc_status = MongoDBHandler.save_openapi_documentation(openapi_doc)
-        print("===OpenAPI doc saved:", doc_result)
+        #doc_result, doc_status = MongoDBHandler.save_openapi_documentation(openapi_doc)
+        #print("===OpenAPI doc saved:", doc_result)
     else:
         doc_result, doc_status = {"message": "CPPS not saved, skipping OpenAPI"}, 400
 
     return Response({
         "cpps_service": result,
-        "openapi_documentation": doc_result
+       # "openapi_documentation": doc_result
     }, status=status_code)
 
 
