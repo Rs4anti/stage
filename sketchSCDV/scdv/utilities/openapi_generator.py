@@ -70,16 +70,10 @@ class OpenAPIGenerator:
     @staticmethod
     def generate_cpps_openapi(doc, atomic_map, cpps_map):
         """
-        Genera un documento OpenAPI v3.1 per un CPPS orchestrato,
-        includendo fork paralleli, scelte esclusive e componenti atomici.
-
-        Args:
-            doc (dict): Documento CPPS
-            atomic_map (dict): task_id → servizio atomico
-            cpps_map (dict): group_id → CPPS annidato
-
-        Returns:
-            dict: documento OpenAPI serializzabile
+        Genera documentazione OpenAPI v3.1 per un CPPS orchestrato.
+        - ParallelGateway come fork (solo se ha più target)
+        - Nessuna duplicazione delle attività
+        - Join gateway ignorati
         """
 
         group_id = doc.get("group_id")
@@ -93,19 +87,18 @@ class OpenAPIGenerator:
         for comp in doc.get("components", []):
             comp_id = comp.get("id")
             comp_type = comp.get("type")
-
             if comp_type == "Atomic" and comp_id in atomic_map:
                 components_names.append(atomic_map[comp_id].get("name", comp_id))
             elif comp_type == "CPPS" and comp_id in cpps_map:
                 components_names.append(cpps_map[comp_id].get("name", comp_id))
-            # Non includere i gateway qui
 
-        # === x-structure ===
+        # === STRUTTURA WORKFLOW ===
         structure = {
             "type": workflow_type,
             "steps": []
         }
 
+        # Mappa componenti e controllo duplicazioni
         component_map = {c["id"]: c for c in doc.get("components", [])}
         included_ids = set()
 
@@ -113,48 +106,51 @@ class OpenAPIGenerator:
             comp_id = comp.get("id")
             comp_type = comp.get("type")
 
-            # === GESTIONE PARALLEL GATEWAY ===
+            if comp_id in included_ids:
+                continue
+
+            # === ParallelGateway: fork solo se ha >1 targets ===
             if comp_type == "ParallelGateway":
                 targets = comp.get("targets", [])
-                branches = []
-
-                for tid in targets:
-                    target_doc = atomic_map.get(tid) or {"name": tid}
-                    branches.append({
-                        "activity": target_doc.get("name", tid),
-                        "id": tid
+                if len(targets) > 1:
+                    branches = []
+                    for tid in targets:
+                        if tid in atomic_map:
+                            branches.append({
+                                "activity": atomic_map[tid].get("name", tid),
+                                "id": tid
+                            })
+                            included_ids.add(tid)  # evita duplicazione
+                    structure["steps"].append({
+                        "type": "parallel",
+                        "gateway_id": comp_id,
+                        "branches": branches
                     })
-                    included_ids.add(tid)
+                    included_ids.add(comp_id)
+                else:
+                    # È probabilmente un join: ignoralo
+                    included_ids.add(comp_id)
 
-                structure["steps"].append({
-                    "type": "parallel",
-                    "gateway_id": comp_id,
-                    "branches": branches
-                })
-                included_ids.add(comp_id)
-
-            # === GESTIONE EXCLUSIVE GATEWAY ===
+            # === ExclusiveGateway ===
             elif comp_type == "ExclusiveGateway":
                 targets = comp.get("targets", [])
-                branches = []
-
-                for tid in targets:
-                    target_doc = atomic_map.get(tid) or {"name": tid}
-                    branches.append({
-                        "activity": target_doc.get("name", tid),
-                        "id": tid
-                        # "x-condition": "..."  # puoi aggiungere se hai condizioni note
+                if targets:
+                    branches = []
+                    for tid in targets:
+                        if tid in atomic_map:
+                            branches.append({
+                                "activity": atomic_map[tid].get("name", tid),
+                                "id": tid
+                            })
+                            included_ids.add(tid)
+                    structure["steps"].append({
+                        "type": "exclusive",
+                        "gateway_id": comp_id,
+                        "branches": branches
                     })
-                    included_ids.add(tid)
+                    included_ids.add(comp_id)
 
-                structure["steps"].append({
-                    "type": "exclusive",
-                    "gateway_id": comp_id,
-                    "branches": branches
-                })
-                included_ids.add(comp_id)
-
-            # === ATTIVITÀ ATOMICHE NORMALI ===
+            # === Atomic fuori da gateway ===
             elif comp_type == "Atomic" and comp_id not in included_ids:
                 structure["steps"].append({
                     "activity": atomic_map.get(comp_id, {}).get("name", comp_id),
@@ -162,12 +158,11 @@ class OpenAPIGenerator:
                 })
                 included_ids.add(comp_id)
 
-        # === PATHS ===
+        # === ENDPOINTS ===
         paths = {}
         for ep in doc.get("endpoints", []):
             url = ep.get("url")
             method = ep.get("method", "POST").lower()
-
             if url:
                 paths.setdefault(url, {})[method] = {
                     "summary": description or "CPPS composite service",
@@ -190,7 +185,7 @@ class OpenAPIGenerator:
                 }
             }
 
-        # === DOCUMENTO OPENAPI ===
+        # === DOCUMENTO OPENAPI COMPLETO ===
         openapi_doc = {
             "openapi": "3.1.0",
             "info": {
