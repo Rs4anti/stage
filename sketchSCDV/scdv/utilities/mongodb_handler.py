@@ -106,7 +106,7 @@ class MongoDBHandler:
             'name',
             'description',
             'workflow_type',
-            'members',
+            'components',
             'actors',
             'gdpr_map'
         ]
@@ -143,7 +143,7 @@ class MongoDBHandler:
             }
 
             # Unisco atomic_services + nested_cpps in components
-            doc['components'] = data.get('components', data['members'] + data.get('nested_cpps', []))
+            doc['components'] =  data['components']
 
             result = cppn_collection.update_one(
                 {'group_id': data['group_id']},
@@ -155,7 +155,7 @@ class MongoDBHandler:
             return {'status': 'ok', 'created': created}, 200
 
         except Exception as e:
-            return {'error': str(e)}, 
+            return {'error': str(e)}, 500
 
     @staticmethod
     def save_cpps(data):

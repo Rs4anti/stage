@@ -21,6 +21,9 @@ urlpatterns = [
 
     #swagger view openapi di un cpps
     path('schema/cpps/<str:group_id>/', views.cpps_service_schema, name='cpps-schema-by-id'),
+    
+    path('docs/cpps/view/<str:group_id>/', views.swagger_viewer_cpps, name='swagger-viewer-cpps'),
+
 
     # Schema JSON singolo CPPS
     path('schema/cpps/<str:group_id>/', views.cpps_service_schema, name='cpps-schema-by-id'),
@@ -30,6 +33,9 @@ urlpatterns = [
 
     ##swagger view openapi di un cppn
     path('schema/cppn/<str:group_id>/', views.cppn_service_schema, name='cppn-schema-by-id'),
+    # Swagger view openapi per CPPN
+    path('docs/cppn/view/<str:group_id>/', views.swagger_viewer_cppn, name='swagger-viewer-cppn'),
+
   
     # Schema JSON singolo CPPN
     path('schema/cppn/<str:group_id>/', views.cppn_service_schema, name='cppn-schema-by-id'),

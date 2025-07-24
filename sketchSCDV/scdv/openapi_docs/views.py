@@ -238,3 +238,17 @@ def cppn_service_schema(request, group_id):
         return JsonResponse({'error': 'CPPN not found'}, status=404)
     doc.pop('_id', None)
     return JsonResponse(doc)
+
+from django.urls import reverse
+def swagger_viewer_cpps(request, group_id):
+    schema_url = reverse('cpps-schema-by-id', args=[group_id])
+    return render(request, 'openapi_docs/swagger_viewer.html', {
+        'schema_url': schema_url
+    })
+
+def swagger_viewer_cppn(request, group_id):
+    schema_url = reverse('cppn-schema-by-id', args=[group_id])
+    return render(request, 'openapi_docs/swagger_viewer.html', {
+        'schema_url': schema_url
+    })
+

@@ -70,113 +70,44 @@ class OpenAPIGenerator:
     @staticmethod
     def generate_cpps_openapi(doc, atomic_map, cpps_map):
         """
-        Genera documentazione OpenAPI v3.1 per un CPPS orchestrato.
-        - ParallelGateway come fork (solo se ha più target)
-        - Nessuna duplicazione delle attività
-        - Join gateway ignorati
+        doc: documento CPPS da cpps_collection
+        atomic_map: dict {task_id: atomic_doc} dei componenti atomic
+        cpps_map: dict {group_id: cpps_doc} dei componenti nested cpps
         """
 
-        group_id = doc.get("group_id")
-        name = doc.get("name", group_id)
-        description = doc.get("description", "")
-        workflow_type = doc.get("workflow_type", "sequence")
-        owner = doc.get("owner", doc.get("actor", ""))
-
-        # === COMPONENTI ===
         components_names = []
+
         for comp in doc.get("components", []):
-            comp_id = comp.get("id")
-            comp_type = comp.get("type")
-            if comp_type == "Atomic" and comp_id in atomic_map:
+            comp_id = comp.get("id") if isinstance(comp, dict) else comp
+            if comp_id in atomic_map:
                 components_names.append(atomic_map[comp_id].get("name", comp_id))
-            elif comp_type == "CPPS" and comp_id in cpps_map:
+            elif comp_id in cpps_map:
                 components_names.append(cpps_map[comp_id].get("name", comp_id))
 
-        # === STRUTTURA WORKFLOW ===
-        structure = {
-            "type": workflow_type,
-            "steps": []
-        }
+        # Costruzione paths
+        path = f"/start-{doc.get('group_id', 'group')}".lower()
+        method = "post"
 
-        # Mappa componenti e controllo duplicazioni
-        component_map = {c["id"]: c for c in doc.get("components", [])}
-        included_ids = set()
-
-        for comp in doc.get("components", []):
-            comp_id = comp.get("id")
-            comp_type = comp.get("type")
-
-            if comp_id in included_ids:
-                continue
-
-            # === ParallelGateway: fork solo se ha >1 targets ===
-            if comp_type == "ParallelGateway":
-                targets = comp.get("targets", [])
-                if len(targets) > 1:
-                    branches = []
-                    for tid in targets:
-                        if tid in atomic_map:
-                            branches.append({
-                                "activity": atomic_map[tid].get("name", tid),
-                                "id": tid
-                            })
-                            included_ids.add(tid)  # evita duplicazione
-                    structure["steps"].append({
-                        "type": "parallel",
-                        "gateway_id": comp_id,
-                        "branches": branches
-                    })
-                    included_ids.add(comp_id)
-                else:
-                    # È probabilmente un join: ignoralo
-                    included_ids.add(comp_id)
-
-            # === ExclusiveGateway ===
-            elif comp_type == "ExclusiveGateway":
-                targets = comp.get("targets", [])
-                if targets:
-                    branches = []
-                    for tid in targets:
-                        if tid in atomic_map:
-                            branches.append({
-                                "activity": atomic_map[tid].get("name", tid),
-                                "id": tid
-                            })
-                            included_ids.add(tid)
-                    structure["steps"].append({
-                        "type": "exclusive",
-                        "gateway_id": comp_id,
-                        "branches": branches
-                    })
-                    included_ids.add(comp_id)
-
-            # === Atomic fuori da gateway ===
-            elif comp_type == "Atomic" and comp_id not in included_ids:
-                structure["steps"].append({
-                    "activity": atomic_map.get(comp_id, {}).get("name", comp_id),
-                    "id": comp_id
-                })
-                included_ids.add(comp_id)
-
-        # === ENDPOINTS ===
-        paths = {}
-        for ep in doc.get("endpoints", []):
-            url = ep.get("url")
-            method = ep.get("method", "POST").lower()
-            if url:
-                paths.setdefault(url, {})[method] = {
-                    "summary": description or "CPPS composite service",
-                    "responses": {
-                        "200": {
-                            "description": "Execution completed"
+        paths = {
+            path: {
+                method: {
+                    "summary": f"Start {doc.get('name', doc.get('group_id'))} workflow",
+                    "parameters": [
+                        {
+                            "name": "trigger_id",
+                            "in": "query",
+                            "required": False,
+                            "schema": { "type": "string" },
+                            "description": "Optional ID to correlate this execution"
+                        },
+                        {
+                            "name": "debug",
+                            "in": "query",
+                            "required": False,
+                            "schema": { "type": "boolean" },
+                            "description": "Enable debug mode (no real execution)"
                         }
-                    }
-                }
-
-        if not paths:
-            paths[f"/start-{group_id.lower()}"] = {
-                "post": {
-                    "summary": f"Start {name} workflow",
+                    ],
                     "responses": {
                         "200": {
                             "description": "Workflow completed successfully"
@@ -184,28 +115,27 @@ class OpenAPIGenerator:
                     }
                 }
             }
+        }
 
-        # === DOCUMENTO OPENAPI COMPLETO ===
-        openapi_doc = {
+        # Schema finale
+        schema = {
             "openapi": "3.1.0",
             "info": {
-                "title": f"CPPS Service: {name}",
+                "title": f"CPPS Service: {doc.get('name', doc.get('group_id'))}",
                 "version": "1.0.0",
-                "description": description,
-                "x-owner": owner,
+                "description": doc.get('description', ''),
+                "x-owner": doc.get("owner", ''),
                 "x-service-type": "cpps",
-                "x-cpps-name": name,
+                "x-cpps-name": doc.get("name", ''),
                 "x-components": components_names,
-                "x-workflow": workflow_type
+                "x-workflow": doc.get("workflow_type", "sequence")
             },
-            "x-structure": structure,
+            "x-structure": doc.get("x-structure", {}),  # opzionale, se già generato prima
             "paths": paths
         }
 
-        return openapi_doc
+        return schema
 
-
-        
 
     @staticmethod
     def generate_cppn_openapi(doc, atomic_map, cpps_map):
@@ -216,20 +146,48 @@ class OpenAPIGenerator:
         """
 
         components_names = []
-        for comp_id in doc.get("components", []):
-            if comp_id in atomic_map:
-                components_names.append(atomic_map[comp_id].get("name", comp_id))
-            elif comp_id in cpps_map:
-                components_names.append(cpps_map[comp_id].get("name", comp_id))
 
-        # Costruzione paths: fallback se vuoto
+        for comp in doc.get("components", []):
+            if isinstance(comp, dict):
+                comp_id = comp.get("id")
+                comp_type = comp.get("type")
+
+                if comp_type == "Atomic" and comp_id in atomic_map:
+                    components_names.append(atomic_map[comp_id].get("name", comp_id))
+                elif comp_type == "CPPS" and comp_id in cpps_map:
+                    components_names.append(cpps_map[comp_id].get("name", comp_id))
+            else:
+                # fallback se comp è una stringa (id puro)
+                if comp in atomic_map:
+                    components_names.append(atomic_map[comp].get("name", comp))
+                elif comp in cpps_map:
+                    components_names.append(cpps_map[comp].get("name", comp))
+
+        # Costruzione paths
         paths = {}
+
         if doc.get("endpoints"):
             for ep in doc["endpoints"]:
                 path = ep.get("url")
                 method = ep.get("method", "POST").lower()
                 paths.setdefault(path, {})[method] = {
                     "summary": doc.get("description", "CPPN composite service"),
+                    "requestBody": {
+                        "required": False,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "input_data": {
+                                            "type": "string",
+                                            "description": "Optional input to trigger CPPN"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
                     "responses": {
                         "200": {
                             "description": doc.get('description', "Execution successful")
@@ -240,9 +198,25 @@ class OpenAPIGenerator:
             paths["/cppn/execute"] = {
                 "post": {
                     "summary": f"Execute {doc.get('name', doc.get('group_id'))} network",
+                    "requestBody": {
+                        "required": False,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "input_data": {
+                                            "type": "string",
+                                            "description": "Optional input to trigger CPPN"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
                     "responses": {
                         "200": {
-                            "description": "Execution successful"
+                            "description": "Workflow completed successfully"
                         }
                     }
                 }
