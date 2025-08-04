@@ -5,7 +5,6 @@ from datetime import datetime
 from .mongodb_handler import (
     MongoDBHandler,
     atomic_services_collection,
-    cpps_collection,
     bpmn_collection
 )
 from .openapi_generator import OpenAPIGenerator
@@ -49,6 +48,7 @@ class BPMNImporterXmlBased:
 
         atomic_count = 0
         cpps_count = 0
+        cppn_count = 0
         ns = self.namespaces
 
         for elem in self.xml_root.iter():
@@ -95,46 +95,134 @@ class BPMNImporterXmlBased:
                 else:
                     print(f"⚠️ Nessuna <atomicExtension> per il task: {task_name}")
 
-            elif tag == "subProcess":
-                group_id = elem.attrib["id"]
-                name = elem.attrib.get("name", f"CPPS {group_id}")
+        group_to_elements = self._extract_group_members()
+        actor_map = self._map_task_to_actor()
 
-                component_ids = [
-                    {"id": child.attrib["id"], "type": "Atomic"}
-                    for child in elem
-                    if self._strip_ns(child.tag) == "task"
-                ]
+        for group_id, members in group_to_elements.items():
+            involved_actors = set(actor_map.get(mid) for mid in members if mid in actor_map)
 
+            valid_tasks = [
+                {"id": mid, "type": "Atomic"}
+                for mid in members
+                if atomic_services_collection.find_one({"task_id": mid})
+            ]
+
+            if not valid_tasks:
+                continue
+
+            if len(involved_actors) == 1:
+                actor = list(involved_actors)[0]
                 cpps_doc = {
                     "diagram_id": str(self.diagram_id),
                     "group_id": group_id,
-                    "name": name,
-                    "description": f"Imported from BPMN {name}",
+                    "name": f"CPPS {group_id}",
+                    "description": f"CPPS for actor {actor}",
                     "workflow_type": "sequence",
-                    "actor": "AutoImport",
-                    "components": component_ids,
+                    "actor": actor,
+                    "components": valid_tasks,
                     "endpoints": [],
                     "group_type": "CPPS"
                 }
-
                 MongoDBHandler.save_cpps(cpps_doc)
 
                 atomic_map = {
-                    a["task_id"]: a
-                    for a in atomic_services_collection.find({
-                        "task_id": {"$in": [c["id"] for c in component_ids]}
+                    a["task_id"]: a for a in atomic_services_collection.find({
+                        "task_id": {"$in": [c["id"] for c in valid_tasks]}
                     })
                 }
 
                 openapi_doc = OpenAPIGenerator.generate_cpps_openapi(cpps_doc, atomic_map, {})
                 MongoDBHandler.save_openapi_documentation(openapi_doc)
                 cpps_count += 1
-                print(f"🧩 CPPS salvato: {name}")
+                print(f"🧩 CPPS salvato: {group_id}")
 
-        print(f"\n✅ Importazione completata: {atomic_count} atomic, {cpps_count} cpps")
+            else:
+                cppn_doc = {
+                    "diagram_id": str(self.diagram_id),
+                    "group_id": group_id,
+                    "name": f"CPPN {group_id}",
+                    "description": f"CPPN for actors: {', '.join(involved_actors)}",
+                    "workflow_type": "sequence",
+                    "actors": list(involved_actors),
+                    "gdpr_map": {},
+                    "components": [c["id"] for c in valid_tasks],
+                    "group_type": "CPPN"
+                }
+                MongoDBHandler.save_cppn(cppn_doc)
+
+                atomic_map = {
+                    a["task_id"]: a for a in atomic_services_collection.find({
+                        "task_id": {"$in": [c["id"] for c in valid_tasks]}
+                    })
+                }
+                cpps_map = {}
+                openapi_doc = OpenAPIGenerator.generate_cppn_openapi(cppn_doc, atomic_map, cpps_map)
+                MongoDBHandler.save_openapi_documentation(openapi_doc)
+                cppn_count += 1
+                print(f"🧠 CPPN salvato: {group_id}")
+
+        print(f"\n✅ Importazione completata: {atomic_count} atomic, {cpps_count} cpps, {cppn_count} cppn")
+
+    def _extract_group_members(self):
+        ns = self.namespaces
+        group_members = {}
+
+        for g in self.xml_root.findall(".//bpmndi:BPMNShape", ns):
+            bpmn_element = g.attrib.get("bpmnElement", "")
+            if not bpmn_element.startswith("Group_"):
+                continue
+
+            group_id = bpmn_element
+            bounds = g.find("dc:Bounds", ns)
+            if bounds is None:
+                continue
+
+            gx = float(bounds.attrib["x"])
+            gy = float(bounds.attrib["y"])
+            gw = float(bounds.attrib["width"])
+            gh = float(bounds.attrib["height"])
+
+            members = []
+            for shape in self.xml_root.findall(".//bpmndi:BPMNShape", ns):
+                target_elem = shape.attrib.get("bpmnElement", "")
+                if target_elem.startswith("Group_"):
+                    continue
+                b = shape.find("dc:Bounds", ns)
+                if b is None:
+                    continue
+
+                x = float(b.attrib["x"])
+                y = float(b.attrib["y"])
+
+                if gx <= x <= gx + gw and gy <= y <= gy + gh:
+                    members.append(target_elem)
+
+            group_members[group_id] = members
+
+        return group_members
+
+    def _map_task_to_actor(self):
+        ns = self.namespaces
+        task_to_actor = {}
+
+        process_to_actor = {
+            p.attrib.get("processRef"): p.attrib.get("name", p.attrib["id"])
+            for p in self.xml_root.findall(".//bpmn:participant", ns)
+            if p.attrib.get("processRef")
+        }
+
+        for proc in self.xml_root.findall(".//bpmn:process", ns):
+            process_id = proc.attrib.get("id")
+            actor = process_to_actor.get(process_id, "UnknownActor")
+
+            for task in proc.findall(".//bpmn:task", ns):
+                tid = task.attrib.get("id")
+                if tid:
+                    task_to_actor[tid] = actor
+
+        return task_to_actor
 
     def _get_namespaces(self):
-        # Estrae i namespace come dict es: {"bpmn": "...", "custom": "..."}
         events = ("start", "start-ns")
         ns = {}
         for event, elem in ET.iterparse(self.bpmn_path, events):
