@@ -16,8 +16,6 @@ openapi_collection = db['openapi']
 
 
 class MongoDBHandler:
-    
-    from bson import ObjectId
 
     @staticmethod
     def save_atomic(data):

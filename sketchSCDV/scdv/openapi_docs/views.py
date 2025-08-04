@@ -4,11 +4,10 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.http import JsonResponse
 from rest_framework.decorators import api_view
+from bson import ObjectId
 
 def openapi_docs_page(request):
     return render(request, 'openapi_docs/openapi_docs.html')
-
-from bson import ObjectId
 
 def atomic_docs_page(request):
     services = list(openapi_collection.find({"info.x-service-type": "atomic"}))
@@ -104,10 +103,6 @@ class AtomicServiceSchemaView(APIView):
             "paths": paths
         }
         return Response(openapi)
-    
-
-
-from bson import ObjectId
 
 @api_view(['GET'])
 def atomic_service_schema(request, task_id):

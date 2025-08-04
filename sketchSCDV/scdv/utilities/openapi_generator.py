@@ -130,7 +130,7 @@ class OpenAPIGenerator:
                 "x-components": components_names,
                 "x-workflow": doc.get("workflow_type", "sequence")
             },
-            "x-structure": doc.get("x-structure", {}),  # opzionale, se già generato prima
+            #"x-structure": doc.get("x-structure", {}),
             "paths": paths
         }
 
