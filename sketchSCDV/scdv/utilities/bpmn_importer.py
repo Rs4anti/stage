@@ -110,14 +110,19 @@ class BPMNImporterXmlBased:
             if not valid_tasks:
                 continue
 
+            group_ext = self.xml_root.find(f".//bpmn:group[@id='{group_id}']/bpmn:extensionElements/custom:groupExtension", ns)
+            group_name = group_ext.find("custom:name", ns).text.strip() if group_ext is not None and group_ext.find("custom:name", ns) is not None else f"Composite {group_id}"
+            group_description = group_ext.find("custom:description", ns).text.strip() if group_ext is not None and group_ext.find("custom:description", ns) is not None else "Imported composite service"
+            workflow_type = group_ext.find("custom:workflowType", ns).text.strip() if group_ext is not None and group_ext.find("custom:workflowType", ns) is not None else "sequence"
+
             if len(involved_actors) == 1:
                 actor = list(involved_actors)[0]
                 cpps_doc = {
                     "diagram_id": str(self.diagram_id),
                     "group_id": group_id,
-                    "name": f"CPPS {group_id}",
-                    "description": f"CPPS for actor {actor}",
-                    "workflow_type": "sequence",
+                    "name": group_name,
+                    "description": group_description,
+                    "workflow_type": workflow_type,
                     "actor": actor,
                     "components": valid_tasks,
                     "endpoints": [],
@@ -140,9 +145,9 @@ class BPMNImporterXmlBased:
                 cppn_doc = {
                     "diagram_id": str(self.diagram_id),
                     "group_id": group_id,
-                    "name": f"CPPN {group_id}",
-                    "description": f"CPPN for actors: {', '.join(involved_actors)}",
-                    "workflow_type": "sequence",
+                    "name": group_name,
+                    "description": group_description,
+                    "workflow_type": workflow_type,
                     "actors": list(involved_actors),
                     "gdpr_map": {},
                     "components": [c["id"] for c in valid_tasks],

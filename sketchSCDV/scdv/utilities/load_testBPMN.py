@@ -6,6 +6,6 @@ client.drop_database(db)
 print(f"⚠️ DB '{db.name}' droppato.")
 
 #carico servizi da file
-bpmn_path = r"C:\Users\santi\Downloads\prova_diagram_paper.bpmn"
+bpmn_path = r"C:\Users\santi\Downloads\dafsdfasdfaf.bpmn"
 importer = BPMNImporterXmlBased(bpmn_path)
 importer.import_all()

@@ -1,7 +1,43 @@
-import { loadAvailableServices } from './editor.js';
+import { loadAvailableServices , ensureDiagramSaved} from './editor.js';
+
+
+
+function addGroupExtension(groupElement, values) {
+  const modeling = bpmnModeler.get('modeling');
+  const moddle = bpmnModeler.get('moddle');
+
+  const extensionProps = {
+    groupType: values.groupType,
+    name: values.name,
+    description: values.description,
+    workflowType: values.workflowType,
+    members: values.components.map(c => c.id).join(','),
+    gdprMap: JSON.stringify(values.gdprMap)
+  };
+
+  if (values.groupType === 'CPPN' && Array.isArray(values.actors)) {
+    extensionProps.actors = values.actors.join(',');
+  }
+
+  if (values.groupType === 'CPPS' && typeof values.actor === 'string') {
+    extensionProps.actor = values.actor;
+  }
+
+  const extension = moddle.create('custom:GroupExtension', extensionProps);
+
+  const extensionElements = moddle.create('bpmn:ExtensionElements', {
+    values: [extension]
+  });
+
+  modeling.updateProperties(groupElement, {
+    extensionElements: extensionElements
+  });
+}
+
+
 
 async function saveCompositeService() {
-  console.log('Function saveCompositeService called');
+  console.log('🟡 Called saveCompositeService');
 
   if (!currentElement || currentElement.type !== 'bpmn:Group') {
     alert("No group selected.");
@@ -15,22 +51,18 @@ async function saveCompositeService() {
   const actor = document.getElementById('singleActor')?.value.trim() || '';
   const actors = document.getElementById('actorsInvolved')?.value.trim() || '';
 
-  //GDPR Mapping dinamico
- // GDPR Mapping dinamico (aggiornato per usare <select>)
   const gdprMap = {};
   const gdprMapContainer = document.getElementById('gdprMapContainer');
   [...gdprMapContainer.children].forEach(row => {
-  const actorInput = row.querySelector('input');
-  const roleSelect = row.querySelector('select');
-  const actorName = actorInput?.value.trim();
-  const role = roleSelect?.value.trim();
-  if (actorName && role) {
-    gdprMap[actorName] = role;
-  }
-});
+    const actorInput = row.querySelector('input');
+    const roleSelect = row.querySelector('select');
+    const actorName = actorInput?.value.trim();
+    const role = roleSelect?.value.trim();
+    if (actorName && role) {
+      gdprMap[actorName] = role;
+    }
+  });
 
-
-  //Endpoint dinamici (solo CPPS)
   const endpointRows = document.querySelectorAll('#endpointsContainer > div');
   const endpoints = Array.from(endpointRows).map(row => {
     const method = row.querySelector('select')?.value || '';
@@ -39,70 +71,90 @@ async function saveCompositeService() {
   });
 
   const { components } = detectGroupMembers(currentElement);
-  console.log("Detected components:", components);
-
+  console.log("🧩 Detected components:", components);
 
   if (!name) {
     alert("Composite service's name is mandatory!");
     return;
   }
 
-  if (!window.diagramId) {
-    const { xml } = await bpmnModeler.saveXML({ format: true });
-    const diagramName = prompt("Insert a name for the diagram:");
-    if (!diagramName) return;
-
-    const csrftoken = getCookie('csrftoken');
-    const response = await fetch('/editor/api/save-diagram/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': csrftoken
-      },
-      body: JSON.stringify({
-        name: diagramName,
-        xml_content: xml
-      })
-    });
-
-    const result = await response.json();
-    window.diagramId = result.id;
+  // ⏳ Salvo il diagramma (se non già fatto)
+  const diagramId = await ensureDiagramSaved();
+  if (!diagramId) {
+    alert("Diagram not saved.");
+    return;
   }
+  window.diagramId = diagramId;
 
-  //Prepara payload
+  // 🧩 Aggiungi extension custom al BPMN
+  console.log("📌 Before extension:", currentElement.businessObject.extensionElements);
+  addGroupExtension(currentElement, {
+    groupType,
+    name,
+    description,
+    workflowType,
+    components,
+    actors: groupType === 'CPPN' ? actors.split(',').map(a => a.trim()) : [],
+    actor: groupType === 'CPPS' ? actor : '',  // ✅ AGGIUNTO QUI,
+    gdprMap
+  });
+  console.log("✅ After extension:", currentElement.businessObject.extensionElements);
+
+  // 🔁 Verifica che l'estensione sia effettivamente nel BPMN XML
+  const { xml } = await bpmnModeler.saveXML({ format: true });
+  console.log("📝 Current BPMN XML:\n", xml);
+
   const payload = {
-    diagram_id: window.diagramId,
+    diagram_id: diagramId,
     group_id: currentElement.id,
     name,
     description,
     workflow_type: workflowType,
-    components,
+    components
   };
 
   try {
     let result;
+    const csrftoken = getCookie('csrftoken');
 
     if (groupType === 'CPPN') {
       payload.group_type = 'CPPN';
       payload.actors = actors.split(',').map(s => s.trim());
       payload.gdpr_map = gdprMap;
-      result = await saveCPPNService(payload);
+      result = await fetch('/editor/api/save-cppn-service/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrftoken
+        },
+        body: JSON.stringify(payload)
+      });
     } else {
       payload.group_type = 'CPPS';
       payload.actor = actor;
       payload.endpoints = endpoints;
-      result = await saveCPPSService(payload);
+      result = await fetch('/editor/api/save-cpps-service/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrftoken
+        },
+        body: JSON.stringify(payload)
+      });
     }
 
-    console.log(`${groupType} saved successfully:`, result);
+    const resData = await result.json();
+
+    if (!result.ok) throw new Error(resData.error || "Server error");
+
+    console.log(`✅ ${groupType} saved successfully:`, resData);
+    bootstrap.Modal.getInstance(document.getElementById('groupTypeModal')).hide();
+    await loadAvailableServices();
+
   } catch (err) {
-    console.error(`Error saving ${groupType}:`, err);
+    console.error(`❌ Error saving ${groupType}:`, err);
     alert(`Error saving ${groupType}: ${err.message}`);
   }
-
-  bootstrap.Modal.getInstance(document.getElementById('groupTypeModal')).hide();
-  
-  await loadAvailableServices();
 }
 
 function getCookie(name) {
