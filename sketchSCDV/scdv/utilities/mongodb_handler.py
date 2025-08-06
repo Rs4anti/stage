@@ -164,7 +164,7 @@ class MongoDBHandler:
             'description',
             'workflow_type',
             'components',
-            'actor',
+            'owner',
             'endpoints'
         ]
 
@@ -189,7 +189,7 @@ class MongoDBHandler:
                 "name": data['name'],
                 "description": data['description'],
                 "workflow_type": data['workflow_type'],
-                "owner": data['actor'],
+                "owner": data['owner'],
                 "endpoints": data['endpoints'],
                 "components": data['components']
             }

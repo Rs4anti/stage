@@ -1,6 +1,7 @@
 import os
 import xml.etree.ElementTree as ET
 from datetime import datetime
+import json
 
 from .mongodb_handler import (
     MongoDBHandler,
@@ -114,6 +115,13 @@ class BPMNImporterXmlBased:
             group_name = group_ext.find("custom:name", ns).text.strip() if group_ext is not None and group_ext.find("custom:name", ns) is not None else f"Composite {group_id}"
             group_description = group_ext.find("custom:description", ns).text.strip() if group_ext is not None and group_ext.find("custom:description", ns) is not None else "Imported composite service"
             workflow_type = group_ext.find("custom:workflowType", ns).text.strip() if group_ext is not None and group_ext.find("custom:workflowType", ns) is not None else "sequence"
+            gdpr_tag = group_ext.find("custom:gdprMap", ns)
+            try:
+                gdpr_map = json.loads(gdpr_tag.text.strip()) if gdpr_tag is not None else {}
+            except json.JSONDecodeError:
+                print(f"⚠️ JSON invalido per gdprMap nel gruppo {group_id}")
+                gdpr_map = {}
+
 
             if len(involved_actors) == 1:
                 actor = list(involved_actors)[0]
@@ -123,7 +131,7 @@ class BPMNImporterXmlBased:
                     "name": group_name,
                     "description": group_description,
                     "workflow_type": workflow_type,
-                    "actor": actor,
+                    "owner": actor,
                     "components": valid_tasks,
                     "endpoints": [],
                     "group_type": "CPPS"
@@ -149,7 +157,7 @@ class BPMNImporterXmlBased:
                     "description": group_description,
                     "workflow_type": workflow_type,
                     "actors": list(involved_actors),
-                    "gdpr_map": {},
+                    "gdpr_map": gdpr_map,
                     "components": [c["id"] for c in valid_tasks],
                     "group_type": "CPPN"
                 }
