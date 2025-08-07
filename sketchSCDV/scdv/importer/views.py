@@ -25,7 +25,7 @@ def upload_imported_diagram(request):
             tmp.flush()
             tmp_path = tmp.name
 
-        importer = BPMNImporterXmlBased(bpmn_path=tmp_path)
+        importer = BPMNImporterXmlBased(bpmn_path=tmp_path, name=name)
         result = importer.import_all()
 
         os.remove(tmp_path)

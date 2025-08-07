@@ -37,9 +37,9 @@
   });
 
   document.getElementById('uploadBtn').addEventListener('click', async () => {
-  if (!fileContent) return alert("⚠️ Nessun file selezionato.");
+  if (!fileContent) return alert("⚠️ No file selected.");
 
-  const name = prompt("Inserisci un nome per il diagramma:");
+  const name = prompt("Insert a diagram's name:");
   if (!name) return;
 
   // Verifica se esiste già (case-insensitive)

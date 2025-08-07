@@ -14,11 +14,12 @@ from .helpers import detect_type
 
 class BPMNImporterXmlBased:
 
-    def __init__(self, bpmn_path):
+    def __init__(self, bpmn_path, name=None):
         self.bpmn_path = bpmn_path
         self.diagram_id = None
         self.xml_root = None
         self.namespaces = {}
+        self.provided_name = name
 
     def parse_bpmn(self):
         tree = ET.parse(self.bpmn_path)
@@ -30,7 +31,7 @@ class BPMNImporterXmlBased:
             xml_content = f.read()
 
         filename = os.path.basename(self.bpmn_path)
-        name = os.path.splitext(filename)[0]
+        name = self.provided_name or os.path.splitext(filename)[0]
 
         doc = {
             "name": name,
@@ -42,6 +43,7 @@ class BPMNImporterXmlBased:
         result = bpmn_collection.insert_one(doc)
         self.diagram_id = result.inserted_id
         print(f"✅ Diagramma salvato con ID: {self.diagram_id}")
+
 
     def _extract_workflow(self, group_id, members):
         ns = self.namespaces
