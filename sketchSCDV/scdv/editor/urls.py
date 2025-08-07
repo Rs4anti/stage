@@ -21,4 +21,7 @@ urlpatterns = [
     path('api/delete_group/<str:group_id>/', views.delete_group, name='delete_group'),
     path('api/add-nested-cpps/<str:group_id>/', views.add_nested_cpps),
     path('api/delete-atomic/<str:atomic_id>/', views.delete_atomic),
+
+    path('api/delete-diagram/<str:diagram_id>/', views.delete_diagram_and_services, name='delete_diagram_and_services'),
+
 ]

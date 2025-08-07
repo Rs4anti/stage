@@ -44,6 +44,7 @@ async function loadDiagramList() {
         <a href="${viewUrl}" class="btn btn-sm btn-info me-2">View</a>
         <button class="btn btn-sm btn-warning me-2" onclick="window.location.href='${editUrl}'">Edit</button>
         <button class="btn btn-sm btn-secondary" onclick="exportDiagram('${d.id}')">Download</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteFullDiagram('${d.id}')">Delete</button>
       </td>
     `;
 
@@ -67,6 +68,25 @@ async function exportDiagram(id) {
   } catch (err) {
     alert("❌ Impossible exporting diagram.");
     console.error(err);
+  }
+}
+
+
+async function deleteFullDiagram(id) {
+  if (!confirm(`⚠️ Vuoi eliminare il diagramma e tutti i servizi collegati (${id})?`)) return;
+
+  try {
+    const res = await fetch(`/editor/api/delete-diagram/${id}/`, { method: 'DELETE' });
+    const data = await res.json();
+
+    if (res.ok) {
+      alert("✅ Eliminazione completata");
+      location.reload();
+    } else {
+      alert("❌ Errore: " + (data.error || "Eliminazione fallita"));
+    }
+  } catch (e) {
+    alert("❌ Errore di rete: " + e.message);
   }
 }
 

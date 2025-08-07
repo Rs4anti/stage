@@ -393,3 +393,42 @@ def delete_atomic(request, atomic_id):
     except Exception as e:
         print(f"❌ Errore durante l'eliminazione dell'atomic: {e}")
         return Response({'error': str(e)}, status=500)
+    
+
+@api_view(['DELETE'])
+def delete_diagram_and_services(request, diagram_id):
+    try:
+        obj_id = ObjectId(diagram_id)
+
+        # Elimina il diagramma
+        result = bpmn_collection.delete_one({"_id": obj_id})
+        if result.deleted_count == 0:
+            return Response({"error": "Diagram not found"}, status=404)
+
+        # Elimina atomic services collegati
+        atomic_deleted = atomic_services_collection.delete_many({"diagram_id": diagram_id})
+
+        # Elimina CPPS collegati
+        cpps_deleted = cpps_collection.delete_many({"diagram_id": diagram_id})
+
+        # Elimina CPPN collegati
+        cppn_deleted = cppn_collection.delete_many({"diagram_id": diagram_id})
+
+        # Elimina documentazione OpenAPI associata
+        from utilities.mongodb_handler import openapi_collection
+        openapi_deleted = openapi_collection.delete_many({"info.x-diagram_id": diagram_id})
+
+
+        return Response({
+            "status": "deleted",
+            "diagram_id": diagram_id,
+            "atomic_deleted": atomic_deleted.deleted_count,
+            "cpps_deleted": cpps_deleted.deleted_count,
+            "cppn_deleted": cppn_deleted.deleted_count,
+            "openapi_deleted": openapi_deleted.deleted_count
+        }, status=200)
+
+    except InvalidId:
+        return Response({"error": "Invalid diagram ID"}, status=400)
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)

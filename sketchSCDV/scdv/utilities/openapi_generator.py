@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 class OpenAPIGenerator:
     @staticmethod
     def generate_atomic_openapi(data):
@@ -29,6 +31,7 @@ class OpenAPIGenerator:
             "info": {
                 "title": data["name"],
                 "version": "1.0.0",
+                "x-diagram_id": data.get("diagram_id"),
                 "x-owner": data["owner"],
                 "x-service-type": "atomic",
                 "x-atomic-type": data["atomic_type"]
@@ -67,6 +70,10 @@ class OpenAPIGenerator:
             }
         }
 
+
+
+    from collections import OrderedDict
+
     @staticmethod
     def generate_cpps_openapi(doc, atomic_map, cpps_map):
         """
@@ -74,40 +81,46 @@ class OpenAPIGenerator:
         atomic_map: dict {task_id: atomic_doc} dei componenti atomic
         cpps_map: dict {group_id: cpps_doc} dei componenti nested cpps
         """
-
         components_names = []
+        structure = OrderedDict()
 
-        for comp in doc.get("components", []):
-            comp_id = comp.get("id") if isinstance(comp, dict) else comp
+        workflow = doc.get("workflow", {})
+        workflow_keys = list(workflow.keys())
+        workflow_targets = {target for targets in workflow.values() for target in targets}
+        all_nodes = list(OrderedDict.fromkeys(workflow_keys + list(workflow_targets)))
+
+        # Build x-structure
+        for comp_id in all_nodes:
+            node = {
+                "next": workflow.get(comp_id, [])
+            }
+
             if comp_id in atomic_map:
-                components_names.append(atomic_map[comp_id].get("name", comp_id))
-            elif comp_id in cpps_map:
-                components_names.append(cpps_map[comp_id].get("name", comp_id))
+                node["type"] = "Atomic"
+                node["name"] = atomic_map[comp_id].get("name", comp_id)
+                components_names.append(node["name"])
 
-        # Costruzione paths
+            elif comp_id in cpps_map:
+                node["type"] = "CPPS"
+                node["name"] = cpps_map[comp_id].get("name", comp_id)
+                components_names.append(node["name"])
+
+            else:
+                # fallback: gateway or unknown
+                comp = next((c for c in doc.get("components", []) if c["id"] == comp_id), {})
+                node["type"] = comp.get("type", "Unknown")
+                node["name"] = comp.get("name", comp_id)
+
+            structure[comp_id] = node
+
+        # Path
         path = f"/start-{doc.get('group_id', 'group')}".lower()
-        method = "post"
 
         paths = {
             path: {
-                method: {
+                "post": {
                     "summary": f"Start {doc.get('name', doc.get('group_id'))} workflow",
-                    "parameters": [
-                        {
-                            "name": "trigger_id",
-                            "in": "query",
-                            "required": False,
-                            "schema": { "type": "string" },
-                            "description": "Optional ID to correlate this execution"
-                        },
-                        {
-                            "name": "debug",
-                            "in": "query",
-                            "required": False,
-                            "schema": { "type": "boolean" },
-                            "description": "Enable debug mode (no real execution)"
-                        }
-                    ],
+                    # No parameters
                     "responses": {
                         "200": {
                             "description": "Workflow completed successfully"
@@ -117,20 +130,21 @@ class OpenAPIGenerator:
             }
         }
 
-        # Schema finale
+        # Final schema
         schema = {
             "openapi": "3.1.0",
             "info": {
                 "title": f"CPPS Service: {doc.get('name', doc.get('group_id'))}",
                 "version": "1.0.0",
                 "description": doc.get('description', ''),
+                "x-diagram_id": doc.get("diagram_id"),
                 "x-owner": doc.get("owner", ''),
                 "x-service-type": "cpps",
                 "x-cpps-name": doc.get("name", ''),
                 "x-components": components_names,
                 "x-workflow": doc.get("workflow_type", "sequence")
             },
-            #"x-structure": doc.get("x-structure", {}),
+            "x-structure": structure,
             "paths": paths
         }
 
@@ -229,6 +243,7 @@ class OpenAPIGenerator:
                 "title": f"CPPN Service: {doc.get('name', doc.get('group_id'))}",
                 "version": "1.0.0",
                 "description": doc.get('description', ''),
+                "x-diagram_id": doc.get("diagram_id"),
                 "x-actors": doc.get("actors", []),
                 "x-cppn-name": doc.get("name", ''),
                 "x-service-type": "cppn",

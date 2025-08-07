@@ -225,6 +225,13 @@ class BPMNImporterXmlBased:
                 print(f"🧠 CPPN salvato: {group_id}")
 
         print(f"\n✅ Importazione completata: {atomic_count} atomic, {cpps_count} cpps, {cppn_count} cppn")
+        
+        return {
+            "diagram_id": str(self.diagram_id),
+            "atomic": atomic_count,
+            "cpps": cpps_count,
+            "cppn": cppn_count
+        }
 
     def _extract_group_members(self):
         ns = self.namespaces

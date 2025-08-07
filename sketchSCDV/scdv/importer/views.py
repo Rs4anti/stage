@@ -1,9 +1,11 @@
-from django.shortcuts import render
+import os
+import uuid
+from tempfile import NamedTemporaryFile
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-import uuid
-from utilities.mongodb_handler import bpmn_collection
 from django.shortcuts import render
+
+from utilities.bpmn_importer import BPMNImporterXmlBased  # Assicurati sia correttamente importata
 
 def importer_home(request):
     return render(request, 'importer/home.html')
@@ -17,10 +19,30 @@ def upload_imported_diagram(request):
     if not name or not xml:
         return Response({'error': 'Missing data'}, status=400)
 
-    result = bpmn_collection.insert_one({
-        'name': name,
-        'xml_content': xml
-    })
+    try:
+        with NamedTemporaryFile(mode='w+', suffix=".bpmn", delete=False) as tmp:
+            tmp.write(xml)
+            tmp.flush()
+            tmp_path = tmp.name
 
-    return Response({'id': str(result.inserted_id)})
+        importer = BPMNImporterXmlBased(bpmn_path=tmp_path)
+        result = importer.import_all()
+
+        os.remove(tmp_path)
+
+        return Response(result)
+
+    except Exception as e:
+        return Response({'error': f'Import failed: {str(e)}'}, status=500)
+
+
+from django.shortcuts import render
+
+def import_summary(request):
+    return render(request, 'importer/summary.html', {
+        'diagram_id': request.GET.get('diagram_id'),
+        'atomic': request.GET.get('atomic', 0),
+        'cpps': request.GET.get('cpps', 0),
+        'cppn': request.GET.get('cppn', 0)
+    })
 

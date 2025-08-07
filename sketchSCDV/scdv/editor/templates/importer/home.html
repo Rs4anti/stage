@@ -63,9 +63,10 @@
   });
 
   if (res.ok) {
-    const data = await res.json();
-    window.location.href = `/editor/?id=${data.id}`;
-  } else {
+  const data = await res.json();
+  const query = new URLSearchParams(data).toString();
+  window.location.href = `/importer/summary/?${query}`;
+  }else {
     alert("Import error.");
   }
 });

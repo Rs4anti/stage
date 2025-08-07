@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Swagger UI</title>
+  <title>Swagger UI with Workflow Structure</title>
   <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist/swagger-ui.css" />
   <style>
     html, body {
@@ -10,20 +10,80 @@
       padding: 0;
     }
     #swagger-ui {
-      height: 100vh;
+      height: 85vh;
+    }
+    #x-structure-panel {
+      padding: 1rem;
+      font-family: monospace;
+      background: #f7f7f7;
+      border-top: 1px solid #ccc;
+      overflow-x: auto;
+    }
+    .x-title {
+      font-weight: bold;
+      margin-bottom: 0.5rem;
     }
   </style>
 </head>
 <body>
 <div id="swagger-ui"></div>
+<div id="x-structure-panel">
+  <div class="x-title">Workflow Structure (<code>x-structure</code>)</div>
+  <pre id="structure-content">Loading...</pre>
+</div>
+
 <script src="https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js"></script>
 <script>
+  const schemaUrl = "{{ schema_url }}"; // Può essere sostituito da uno URL reale
+
   window.onload = () => {
-    SwaggerUIBundle({
-      url: "{{ schema_url }}",
+    const ui = SwaggerUIBundle({
+      url: schemaUrl,
       dom_id: '#swagger-ui',
       presets: [SwaggerUIBundle.presets.apis],
+      layout: "BaseLayout"
     });
+
+    // Attendi caricamento dello schema
+    const interval = setInterval(() => {
+      const spec = ui.specSelectors?.specJson?.()?.toJS?.();
+      if (!spec) return;
+
+      const structure = spec["x-structure"];
+      if (structure) {
+        clearInterval(interval);
+
+        const lines = [];
+       for (const [id, node] of Object.entries(structure)) {
+  let sourceLabel;
+
+  if (node.type?.toLowerCase()?.includes("gateway")) {
+    // Mostra il tipo gateway come label (es. ParallelGateway → [Parallel])
+    const type = node.type.replace(/Gateway$/, '').trim(); // "Parallel"
+    sourceLabel = `[${type}]`;
+  } else {
+    sourceLabel = node.name || id;
+  }
+
+  const targetLabels = (node.next || []).map(targetId => {
+    const targetNode = structure[targetId];
+    if (!targetNode) return targetId;
+
+    if (targetNode.type?.toLowerCase()?.includes("gateway")) {
+      const t = targetNode.type.replace(/Gateway$/, '').trim();
+      return `[${t}]`;
+    }
+
+    return targetNode.name || targetId;
+  });
+
+  lines.push(`${sourceLabel} → ${targetLabels.join(", ")}`);
+}
+
+
+        document.getElementById("structure-content").textContent = lines.join("\n");
+      }
+    }, 500);
   };
 </script>
 </body>
