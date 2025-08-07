@@ -130,30 +130,31 @@ def save_cpps_service(request):
     data = request.data
     print("===CPPS Payload received:", data)
 
+    # Estrai componenti
+    components = data.get('components', [])
+    component_ids = [c['id'] for c in components if c['type'] == 'Atomic']
+    cpps_ids = [c['id'] for c in components if c['type'] == 'CPPS']
+
+    # Recupera documenti atomic e cpps annidati
+    atomic_map = {
+        a["task_id"]: a
+        for a in atomic_services_collection.find({"task_id": {"$in": component_ids}})
+    }
+
+    cpps_map = {
+        c["group_id"]: c
+        for c in cpps_collection.find({"group_id": {"$in": cpps_ids}})
+    }
+
+    # ✅ Normalizza components e workflow
+    data["components"], data["workflow"] = normalize_components_and_workflow(data, cpps_map)
+
+    # ✅ Salva nel DB
     result, status_code = MongoDBHandler.save_cpps(data)
 
     if status_code in [200, 201]:
-        # Recupera i documenti atomic e cpps referenziati nei components
-        components = data.get('components', [])
-
-        component_ids = [c['id'] for c in components if c['type'] == 'Atomic']
-        cpps_ids = [c['id'] for c in components if c['type'] == 'CPPS']
-
-        atomic_map = {
-            a["task_id"]: a
-            for a in atomic_services_collection.find({"task_id": {"$in": component_ids}})
-        }
-
-        cpps_map = {
-            c["group_id"]: c
-            for c in cpps_collection.find({"group_id": {"$in": cpps_ids}})
-        }
-
-
-        # Genera documentazione OpenAPI per il CPPS
+        # Genera OpenAPI
         openapi_doc = OpenAPIGenerator.generate_cpps_openapi(data, atomic_map, cpps_map)
-
-        # Salva documentazione OpenAPI nella collection openapi
         doc_result, doc_status = MongoDBHandler.save_openapi_documentation(openapi_doc)
         print("===OpenAPI doc saved:", doc_result)
     else:
@@ -164,6 +165,62 @@ def save_cpps_service(request):
         "openapi_documentation": doc_result
     }, status=status_code)
 
+from collections import OrderedDict
+
+def normalize_components_and_workflow(data, cpps_map):
+    components = data.get('components', [])
+    workflow = data.get('workflow', {})
+
+    nested_atomic_ids = {
+        comp["id"]
+        for c in components if c["type"] == "CPPS"
+        for comp in cpps_map.get(c["id"], {}).get("components", [])
+        if comp["type"] == "Atomic"
+    }
+
+    filtered_components = [
+        c for c in components
+        if c["type"] != "Atomic" or c["id"] not in nested_atomic_ids
+    ]
+
+    new_workflow = OrderedDict()
+
+    # 🔧 PRIMA: inserisci Group → Primo Nodo Esterno
+    for group_id, group_doc in cpps_map.items():
+        last_atomic_ids = [
+            atomic["id"] for atomic in group_doc.get("components", [])
+            if atomic["type"] == "Atomic"
+        ]
+
+        outgoing = set()
+        for atomic_id in last_atomic_ids:
+            targets = workflow.get(atomic_id, [])
+            for t in targets:
+                if t not in nested_atomic_ids:
+                    outgoing.add(t)
+
+        if outgoing:
+            new_workflow[group_id] = list(outgoing)
+
+    # DOPO: il resto del workflow
+    for source, targets in workflow.items():
+        if source in nested_atomic_ids:
+            continue
+
+        new_targets = []
+        for target in targets:
+            if target in nested_atomic_ids:
+                for group_id, group_doc in cpps_map.items():
+                    group_atomic_ids = [c["id"] for c in group_doc.get("components", []) if c["type"] == "Atomic"]
+                    if target in group_atomic_ids:
+                        target = group_id
+                        break
+            new_targets.append(target)
+
+        if new_targets:
+            new_workflow[source] = new_targets
+
+    return filtered_components, new_workflow
 
 
 @api_view(['POST'])

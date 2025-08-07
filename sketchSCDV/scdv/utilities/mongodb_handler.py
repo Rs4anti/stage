@@ -194,6 +194,10 @@ class MongoDBHandler:
                 "components": data['components']
             }
 
+            if 'workflow' in data:
+                doc['workflow'] = data['workflow']
+
+
             result = cpps_collection.update_one(
                 {'group_id': data['group_id']},
                 {'$set': doc},

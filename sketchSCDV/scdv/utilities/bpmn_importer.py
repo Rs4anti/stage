@@ -43,6 +43,50 @@ class BPMNImporterXmlBased:
         self.diagram_id = result.inserted_id
         print(f"✅ Diagramma salvato con ID: {self.diagram_id}")
 
+    def _extract_workflow(self, group_id, members):
+        ns = self.namespaces
+        workflow = {}
+
+        for seq in self.xml_root.findall(".//bpmn:sequenceFlow", ns):
+            source_ref = seq.attrib.get("sourceRef")
+            target_ref = seq.attrib.get("targetRef")
+
+            if source_ref in members and target_ref in members:
+                if source_ref not in workflow:
+                    workflow[source_ref] = []
+                workflow[source_ref].append(target_ref)
+
+        return workflow
+
+    def _extract_gateways(self, members):
+        ns = self.namespaces
+        gateway_tags = {
+            "bpmn:parallelGateway": "ParallelGateway",
+            "bpmn:exclusiveGateway": "ExclusiveGateway",
+            "bpmn:inclusiveGateway": "InclusiveGateway"
+        }
+
+        gateway_components = []
+
+        for gw_tag, gw_type in gateway_tags.items():
+            for gw in self.xml_root.findall(f".//{gw_tag}", ns):
+                gw_id = gw.attrib.get("id")
+                if not gw_id or gw_id not in members:
+                    continue
+
+                targets = []
+                for seq in self.xml_root.findall(".//bpmn:sequenceFlow", ns):
+                    if seq.attrib.get("sourceRef") == gw_id and seq.attrib.get("targetRef") in members:
+                        targets.append(seq.attrib["targetRef"])
+
+                gateway_components.append({
+                    "id": gw_id,
+                    "type": gw_type,
+                    "targets": targets
+                })
+
+        return gateway_components
+
     def import_all(self):
         self.parse_bpmn()
         self.save_diagram()
@@ -122,9 +166,13 @@ class BPMNImporterXmlBased:
                 print(f"⚠️ JSON invalido per gdprMap nel gruppo {group_id}")
                 gdpr_map = {}
 
-
             if len(involved_actors) == 1:
                 actor = list(involved_actors)[0]
+                workflow = self._extract_workflow(group_id, members)
+                gateway_components = self._extract_gateways(members)
+                valid_task_ids = [c['id'] for c in valid_tasks]
+                components = valid_tasks + gateway_components
+
                 cpps_doc = {
                     "diagram_id": str(self.diagram_id),
                     "group_id": group_id,
@@ -132,15 +180,17 @@ class BPMNImporterXmlBased:
                     "description": group_description,
                     "workflow_type": workflow_type,
                     "owner": actor,
-                    "components": valid_tasks,
+                    "components": components,
                     "endpoints": [],
-                    "group_type": "CPPS"
+                    "group_type": "CPPS",
+                    "workflow": workflow
                 }
+
                 MongoDBHandler.save_cpps(cpps_doc)
 
                 atomic_map = {
                     a["task_id"]: a for a in atomic_services_collection.find({
-                        "task_id": {"$in": [c["id"] for c in valid_tasks]}
+                        "task_id": {"$in": valid_task_ids}
                     })
                 }
 

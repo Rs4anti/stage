@@ -37,7 +37,6 @@ function addGroupExtension(groupElement, values) {
 
 
 async function saveCompositeService() {
-  console.log('🟡 Called saveCompositeService');
 
   if (!currentElement || currentElement.type !== 'bpmn:Group') {
     alert("No group selected.");
@@ -70,7 +69,7 @@ async function saveCompositeService() {
     return { method, url };
   });
 
-  const { components } = detectGroupMembers(currentElement);
+  const { components, workflow } = detectGroupMembers(currentElement);
   console.log("🧩 Detected components:", components);
 
   if (!name) {
@@ -95,12 +94,11 @@ async function saveCompositeService() {
     workflowType,
     components,
     actors: groupType === 'CPPN' ? actors.split(',').map(a => a.trim()) : [],
-    actor: groupType === 'CPPS' ? actor : '',  // ✅ AGGIUNTO QUI,
+    actor: groupType === 'CPPS' ? actor : '',
     gdprMap
   });
   console.log("✅ After extension:", currentElement.businessObject.extensionElements);
 
-  // 🔁 Verifica che l'estensione sia effettivamente nel BPMN XML
   const { xml } = await bpmnModeler.saveXML({ format: true });
   console.log("📝 Current BPMN XML:\n", xml);
 
@@ -131,8 +129,12 @@ async function saveCompositeService() {
       });
     } else {
       payload.group_type = 'CPPS';
-      payload.actor = actor;
+      payload.owner = actor;
       payload.endpoints = endpoints;
+      payload.workflow = workflow;
+
+      console.log("🔀 Workflow detected:", workflow);
+
       result = await fetch('/editor/api/save-cpps-service/', {
         method: 'POST',
         headers: {
@@ -218,10 +220,9 @@ function detectGroupMembers(groupElement) {
     inner.x + inner.width <= outer.x + outer.width &&
     inner.y + inner.height <= outer.y + outer.height;
 
-  // === COMPONENTI ===
   const components = [];
 
-  // 1. Atomic services (task-like)
+  // 1. Atomic services (Tasks, CallActivities, SubProcesses)
   const taskLike = elementRegistry.filter(el =>
     ['bpmn:Task', 'bpmn:CallActivity', 'bpmn:SubProcess'].includes(el.type)
   );
@@ -236,13 +237,13 @@ function detectGroupMembers(groupElement) {
     }
   });
 
-  // 2. Gateway
+  // 2. Gateways (Parallel, Exclusive, Inclusive)
   const gatewayTypes = ['bpmn:ParallelGateway', 'bpmn:ExclusiveGateway', 'bpmn:InclusiveGateway'];
   const gateways = elementRegistry.filter(el => gatewayTypes.includes(el.type));
 
   gateways.forEach(gw => {
-    const gwBox = canvas.getAbsoluteBBox(gw);
-    if (!isStrictlyInside(gwBox, groupBBox)) return;
+    const bbox = canvas.getAbsoluteBBox(gw);
+    if (!isStrictlyInside(bbox, groupBBox)) return;
 
     const outgoingTargets = (gw.outgoing || [])
       .map(flow => flow.target?.id)
@@ -255,22 +256,39 @@ function detectGroupMembers(groupElement) {
     });
   });
 
-  // 3. Gruppi annidati (altri CPPS)
+  // 3. CPPS annidati
   const allGroups = elementRegistry.filter(el => el.type === 'bpmn:Group');
   const nestedCPPS = allGroups
     .filter(el => el.id !== groupElement.id && isStrictlyInside(canvas.getAbsoluteBBox(el), groupBBox))
     .map(el => el.id);
 
-  const nestedComponents = nestedCPPS.map(el => ({
-  id: el.id,
-  type: 'CPPS'
-}));
+  const nestedComponents = nestedCPPS.map(id => ({
+    id,
+    type: 'CPPS'
+  }));
 
-  
-return {
-  components: [...components, ...nestedComponents]
-};
+  // 4. Sequence Flows (solo interni al gruppo)
+  const sequenceFlows = elementRegistry.filter(el => el.type === 'bpmn:SequenceFlow')
+    .filter(flow => {
+      const sourceBBox = canvas.getAbsoluteBBox(flow.source);
+      const targetBBox = canvas.getAbsoluteBBox(flow.target);
+      return isStrictlyInside(sourceBBox, groupBBox) && isStrictlyInside(targetBBox, groupBBox);
+    });
+
+  const workflow = {};
+  sequenceFlows.forEach(flow => {
+    const sourceId = flow.source.id;
+    const targetId = flow.target.id;
+    if (!workflow[sourceId]) workflow[sourceId] = [];
+    workflow[sourceId].push(targetId);
+  });
+
+  return {
+    components: [...components, ...nestedComponents],
+    workflow
+  };
 }
+
 
 
 
