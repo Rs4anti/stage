@@ -143,6 +143,10 @@ class MongoDBHandler:
             # Unisco atomic_services + nested_cpps in components
             doc['components'] =  data['components']
 
+            #salvo grafo connessione components se presente
+            if 'workflow' in data:
+                doc['workflow'] = data['workflow']
+
             result = cppn_collection.update_one(
                 {'group_id': data['group_id']},
                 {'$set': doc},

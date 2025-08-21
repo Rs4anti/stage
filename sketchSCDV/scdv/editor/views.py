@@ -222,13 +222,83 @@ def normalize_components_and_workflow(data, cpps_map):
 
     return filtered_components, new_workflow
 
+def normalize_cppn_components_and_workflow(data, cpps_map):
+    """
+    Come normalize_components_and_workflow ma applicata a un CPPN:
+    - se nel workflow compaiono atomic appartenenti a CPPS, sostituiscili con il group_id del CPPS
+    - aggiungi archi Group_CPPS -> next esterni quando l’uscita dai CPPS va fuori
+    """
+    from collections import OrderedDict
+
+    components = data.get('components', [])
+    workflow = data.get('workflow', {})
+
+    # tutti gli atomic contenuti nei CPPS referenziati nel CPPN
+    nested_atomic_ids_by_group = {
+        gid: [c["id"] for c in doc.get("components", []) if c["type"] == "Atomic"]
+        for gid, doc in cpps_map.items()
+    }
+    nested_atomic_ids = {aid for lst in nested_atomic_ids_by_group.values() for aid in lst}
+
+    # 1) i componenti restano: Atomic / CPPS / Gateways (non togliamo Atomic “doppi” perché
+    #    nel CPPN vogliamo poterli referenziare ma verranno mappati al CPPS nel workflow)
+    new_components = components
+
+    # 2) workflow normalizzato
+    new_workflow = OrderedDict()
+
+    # 2a) per ogni CPPS: archi "Group -> primo esterno"
+    for gid, atomic_ids in nested_atomic_ids_by_group.items():
+        outgoing = set()
+        for aid in atomic_ids:
+            for t in workflow.get(aid, []):
+                # se il target NON è interno al medesimo CPPS, è un’uscita verso l’esterno
+                if t not in nested_atomic_ids:
+                    outgoing.add(t)
+        if outgoing:
+            new_workflow[gid] = list(outgoing)
+
+    # 2b) resto del workflow con sostituzioni atomic-in-CPPS -> group_id
+    for source, targets in workflow.items():
+        # se la sorgente è atomic interno a un CPPS, salta (già gestito dal "Group -> esterno")
+        if source in nested_atomic_ids:
+            continue
+
+        mapped_source = source
+        # se il source è interno a un CPPS, mappalo al CPPS
+        for gid, lst in nested_atomic_ids_by_group.items():
+            if source in lst:
+                mapped_source = gid
+                break
+
+        mapped_targets = []
+        for t in targets:
+            mapped_t = t
+            for gid, lst in nested_atomic_ids_by_group.items():
+                if t in lst:
+                    mapped_t = gid
+                    break
+            mapped_targets.append(mapped_t)
+
+        if mapped_targets:
+            new_workflow[mapped_source] = mapped_targets
+
+    return new_components, new_workflow
+
 
 @api_view(['POST'])
 def save_cppn_service(request):
     data = request.data
     print("===CPPN Payload received:", data)
 
-    # Salva CPPN nel database
+    # Prepara mappe CPPS (servono per normalizzare)
+    components = data.get('components', [])
+    cpps_ids = [c['id'] for c in components if c['type'] == 'CPPS']
+    cpps_map = { c["group_id"]: c for c in cpps_collection.find({"group_id": {"$in": cpps_ids}}) }
+
+    data["components"], data["workflow"] = normalize_cppn_components_and_workflow(data, cpps_map)
+
+   # Salva CPPN nel database
     result, status_code = MongoDBHandler.save_cppn(data)
 
     if status_code in [200, 201]:
@@ -240,17 +310,13 @@ def save_cppn_service(request):
             return Response({"error": "CPPN saved but not found for OpenAPI generation"}, status=500)
 
         # Recupera i componenti (atomic e cpps)
-        components = saved_doc.get('components', [])
+        comp_ids_atomic = [c["id"] for c in saved_doc.get("components", []) if c["type"] == "Atomic"]
+        comp_ids_cpps   = [c["id"] for c in saved_doc.get("components", []) if c["type"] == "CPPS"]
 
-        atomic_map = {
-            a["task_id"]: a
-            for a in atomic_services_collection.find({"task_id": {"$in": components}})
-        }
-
-        cpps_map = {
-            c["group_id"]: c
-            for c in cpps_collection.find({"group_id": {"$in": components}})
-        }
+        atomic_map = { a["task_id"]: a
+                      for a in atomic_services_collection.find({"task_id": {"$in": comp_ids_atomic}}) }
+        cpps_map   = { c["group_id"]: c
+                      for c in cpps_collection.find({"group_id": {"$in": comp_ids_cpps}}) }
 
         # Genera documentazione OpenAPI per il CPPN
         openapi_doc = OpenAPIGenerator.generate_cppn_openapi(saved_doc, atomic_map, cpps_map)

@@ -110,6 +110,7 @@ async function saveCompositeService() {
     workflow_type: workflowType,
     components
   };
+  payload.workflow = workflow; 
 
   try {
     let result;
@@ -119,6 +120,10 @@ async function saveCompositeService() {
       payload.group_type = 'CPPN';
       payload.actors = actors.split(',').map(s => s.trim());
       payload.gdpr_map = gdprMap;
+      
+      console.log('WF nodes:', Object.keys(workflow));
+      console.log('Payload CPPN:', payload);
+
       result = await fetch('/editor/api/save-cppn-service/', {
         method: 'POST',
         headers: {
@@ -212,82 +217,134 @@ async function saveCPPSService(payload) {
 function detectGroupMembers(groupElement) {
   const elementRegistry = bpmnModeler.get('elementRegistry');
   const canvas = bpmnModeler.get('canvas');
+
   const groupBBox = canvas.getAbsoluteBBox(groupElement);
 
-  const isStrictlyInside = (inner, outer) =>
-    inner.x >= outer.x &&
-    inner.y >= outer.y &&
-    inner.x + inner.width <= outer.x + outer.width &&
-    inner.y + inner.height <= outer.y + outer.height;
+  const isInside = (el) => {
+    const b = canvas.getAbsoluteBBox(el);
+    return (
+      b.x >= groupBBox.x &&
+      b.y >= groupBBox.y &&
+      b.x + b.width  <= groupBBox.x + groupBBox.width &&
+      b.y + b.height <= groupBBox.y + groupBBox.height
+    );
+  };
 
-  const components = [];
+  const isEventType = (t = '') =>
+    t.startsWith('bpmn:StartEvent') ||
+    t.startsWith('bpmn:EndEvent') ||
+    t.startsWith('bpmn:Intermediate');
 
-  // 1. Atomic services (Tasks, CallActivities, SubProcesses)
-  const taskLike = elementRegistry.filter(el =>
-    ['bpmn:Task', 'bpmn:CallActivity', 'bpmn:SubProcess'].includes(el.type)
-  );
+  // --- COMPONENTS -----------------------------------------------------------
 
-  taskLike.forEach(el => {
-    const bbox = canvas.getAbsoluteBBox(el);
-    if (isStrictlyInside(bbox, groupBBox)) {
-      components.push({
-        id: el.id,
-        type: 'Atomic'
+  const componentsMap = new Map(); // id -> {id,type[,targets]}
+  const addComponent = (c) => { if (!componentsMap.has(c.id)) componentsMap.set(c.id, c); };
+
+  // 1) Atomic (Task-like)
+  elementRegistry
+    .filter(el => ['bpmn:Task','bpmn:CallActivity','bpmn:SubProcess'].includes(el.type))
+    .forEach(el => {
+      if (isInside(el)) addComponent({ id: el.id, type: 'Atomic' });
+    });
+
+  // 2) Gateways
+  const gwTypes = ['bpmn:ParallelGateway', 'bpmn:ExclusiveGateway', 'bpmn:InclusiveGateway'];
+  elementRegistry
+    .filter(el => gwTypes.includes(el.type))
+    .forEach(gw => {
+      if (!isInside(gw)) return;
+
+      const outgoingTargets = (gw.outgoing || [])
+        .map(f => f.target?.id)
+        .filter(Boolean);
+
+      // tieni solo target interni e non-evento
+      const filteredTargets = (gw.outgoing || [])
+        .filter(f => !!f.target && isInside(f.target) && !isEventType(f.target.type))
+        .map(f => f.target.id);
+
+      addComponent({
+        id: gw.id,
+        type: gw.type.replace('bpmn:', ''),
+        targets: filteredTargets.length ? filteredTargets : outgoingTargets
       });
-    }
+    });
+
+  // 3) CPPS annidati (altri Group dentro il Group selezionato)
+  const nestedGroups = elementRegistry
+    .filter(el => el.type === 'bpmn:Group' && el.id !== groupElement.id && isInside(el));
+
+  nestedGroups.forEach(g => {
+    // consideralo CPPS solo se l’estensione lo dichiara tale
+    const bo = g.businessObject;
+    const ext = bo?.extensionElements?.values?.find(v => v.$type === 'custom:GroupExtension');
+    const gType = ext?.groupType || ext?.group_type || null;
+    if (gType === 'CPPS') addComponent({ id: g.id, type: 'CPPS' });
   });
 
-  // 2. Gateways (Parallel, Exclusive, Inclusive)
-  const gatewayTypes = ['bpmn:ParallelGateway', 'bpmn:ExclusiveGateway', 'bpmn:InclusiveGateway'];
-  const gateways = elementRegistry.filter(el => gatewayTypes.includes(el.type));
-
-  gateways.forEach(gw => {
-    const bbox = canvas.getAbsoluteBBox(gw);
-    if (!isStrictlyInside(bbox, groupBBox)) return;
-
-    const outgoingTargets = (gw.outgoing || [])
-      .map(flow => flow.target?.id)
-      .filter(Boolean);
-
-    components.push({
-      id: gw.id,
-      type: gw.type.replace('bpmn:', ''),
-      targets: outgoingTargets
-    });
-  });
-
-  // 3. CPPS annidati
-  const allGroups = elementRegistry.filter(el => el.type === 'bpmn:Group');
-  const nestedCPPS = allGroups
-    .filter(el => el.id !== groupElement.id && isStrictlyInside(canvas.getAbsoluteBBox(el), groupBBox))
-    .map(el => el.id);
-
-  const nestedComponents = nestedCPPS.map(id => ({
-    id,
-    type: 'CPPS'
-  }));
-
-  // 4. Sequence Flows (solo interni al gruppo)
-  const sequenceFlows = elementRegistry.filter(el => el.type === 'bpmn:SequenceFlow')
-    .filter(flow => {
-      const sourceBBox = canvas.getAbsoluteBBox(flow.source);
-      const targetBBox = canvas.getAbsoluteBBox(flow.target);
-      return isStrictlyInside(sourceBBox, groupBBox) && isStrictlyInside(targetBBox, groupBBox);
-    });
+  // --- WORKFLOW (edges) -----------------------------------------------------
 
   const workflow = {};
-  sequenceFlows.forEach(flow => {
-    const sourceId = flow.source.id;
-    const targetId = flow.target.id;
-    if (!workflow[sourceId]) workflow[sourceId] = [];
-    workflow[sourceId].push(targetId);
-  });
-
-  return {
-    components: [...components, ...nestedComponents],
-    workflow
+  const pushEdge = (srcId, tgtId) => {
+    if (!srcId || !tgtId || srcId === tgtId) return; // no self-loop
+    if (!workflow[srcId]) workflow[srcId] = [];
+    if (!workflow[srcId].includes(tgtId)) workflow[srcId].push(tgtId);
   };
+
+  // A) SequenceFlow interni al group
+  elementRegistry
+    .filter(el => el.type === 'bpmn:SequenceFlow')
+    .forEach(flow => {
+      const s = flow.source, t = flow.target;
+      if (!s || !t) return;
+
+      // consideriamo solo archi con sorgente dentro il group
+      if (!isInside(s)) return;
+
+      // escludi eventi come source/target
+      if (isEventType(s.type) || isEventType(t.type)) return;
+
+      // target deve essere dentro il group (per CPPN non vogliamo uscire)
+      if (!isInside(t)) return;
+
+      pushEdge(s.id, t.id);
+    });
+
+  // B) MessageFlow: includi flussi tra attori (anche fuori→dentro)
+  elementRegistry
+    .filter(el => el.type === 'bpmn:MessageFlow')
+    .forEach(flow => {
+      const s = flow.sourceRef || flow.source; // bpmn-js a volte usa sourceRef
+      const t = flow.targetRef || flow.target;
+      if (!s || !t) return;
+
+      // includi se almeno il target è dentro il group (il tuo caso Customer → Production Leader)
+      const targetInside = elementRegistry.get(t.id) ? isInside(elementRegistry.get(t.id)) : false;
+      const sourceInside = elementRegistry.get(s.id) ? isInside(elementRegistry.get(s.id)) : false;
+
+      if (!targetInside && !sourceInside) return; // irrilevante per il group
+
+      // ignora eventi
+      const sType = elementRegistry.get(s.id)?.type || '';
+      const tType = elementRegistry.get(t.id)?.type || '';
+      if (isEventType(sType) || isEventType(tType)) return;
+
+      pushEdge(s.id, t.id);
+
+      // se sia sorgente che target sono dentro, manteniamo solo l’edge normale;
+      // se è fuori→dentro, l’edge sarà solo message-flow (src fuori, tgt dentro)
+    });
+
+  // --- OUTPUT ---------------------------------------------------------------
+
+  const components = Array.from(componentsMap.values());
+
+  return { components, workflow };
 }
+
+
+
+
 
 
 
