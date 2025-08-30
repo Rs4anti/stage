@@ -1,6 +1,12 @@
 from collections import OrderedDict
 
 class OpenAPIGenerator:
+
+    @staticmethod
+    def _norm(s):
+        if isinstance(s, str):
+            return s.replace("\n", " ").strip()
+        return s
     @staticmethod
     def generate_atomic_openapi(data):
         type_mapping = {
@@ -75,6 +81,8 @@ class OpenAPIGenerator:
     from collections import OrderedDict
 
     @staticmethod
+    
+    @staticmethod
     def generate_cpps_openapi(doc, atomic_map, cpps_map):
         """
         doc: documento CPPS da cpps_collection
@@ -91,26 +99,19 @@ class OpenAPIGenerator:
 
         # Build x-structure
         for comp_id in all_nodes:
-            node = {
-                "next": workflow.get(comp_id, [])
-            }
-
+            node = {"next": workflow.get(comp_id, [])}
             if comp_id in atomic_map:
                 node["type"] = "Atomic"
                 node["name"] = atomic_map[comp_id].get("name", comp_id)
                 components_names.append(node["name"])
-
             elif comp_id in cpps_map:
                 node["type"] = "CPPS"
                 node["name"] = cpps_map[comp_id].get("name", comp_id)
                 components_names.append(node["name"])
-
             else:
-                # fallback: gateway or unknown
                 comp = next((c for c in doc.get("components", []) if c["id"] == comp_id), {})
                 node["type"] = comp.get("type", "Unknown")
                 node["name"] = comp.get("name", comp_id)
-
             structure[comp_id] = node
 
         # Path
@@ -119,12 +120,28 @@ class OpenAPIGenerator:
         paths = {
             path: {
                 "post": {
-                    "summary": f"Start {doc.get('name', doc.get('group_id'))} workflow",
-                    # No parameters
+                    "summary": f"Start {OpenAPIGenerator._norm(doc.get('name', doc.get('group_id')))} workflow",
+                    "operationId": f"start{OpenAPIGenerator._norm(doc.get('name', doc.get('group_id'))).title().replace(' ', '')}",
+                    "tags": ["CPPS"],
+                    "requestBody": {
+                        "required": False,
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/StartRequest" }
+                            }
+                        }
+                    },
                     "responses": {
                         "200": {
-                            "description": "Workflow completed successfully"
-                        }
+                            "description": "Workflow completed successfully",
+                            "content": {
+                                "application/json": {
+                                    "schema": { "$ref": "#/components/schemas/StartResponse" }
+                                }
+                            }
+                        },
+                        "400": { "description": "Bad Request" },
+                        "500": { "description": "Internal Server Error" }
                     }
                 }
             }
@@ -134,9 +151,9 @@ class OpenAPIGenerator:
         schema = {
             "openapi": "3.1.0",
             "info": {
-                "title": f"CPPS Service: {doc.get('name', doc.get('group_id'))}",
+                "title": f"CPPS Service: {OpenAPIGenerator._norm(doc.get('name', doc.get('group_id')))}",
                 "version": "1.0.0",
-                "description": doc.get('description', ''),
+                "description": OpenAPIGenerator._norm(doc.get('description', '')),
                 "x-diagram_id": doc.get("diagram_id"),
                 "x-owner": doc.get("owner", ''),
                 "x-service-type": "cpps",
@@ -144,8 +161,35 @@ class OpenAPIGenerator:
                 "x-components": components_names,
                 "x-workflow": doc.get("workflow_type", "sequence")
             },
+            "servers": [{"url": "/api"}],
             "x-structure": structure,
-            "paths": paths
+            "paths": paths,
+            "components": {
+                "schemas": {
+                    "StartRequest": {
+                        "type": "object",
+                        "properties": {
+                            "input_data": {
+                                "type": "string",
+                                "description": "Optional input to trigger CPPS"
+                            }
+                        }
+                    },
+                    "StartResponse": {
+                        "type": "object",
+                        "required": ["status"],
+                        "properties": {
+                            "status": {"type": "string", "enum": ["completed", "failed"]},
+                            "traceId": {"type": "string"},
+                            "outputs": {"type": "object", "additionalProperties": True}
+                        }
+                    }
+                },
+                "securitySchemes": {
+                    "bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}
+                }
+            },
+            "security": [{"bearerAuth": []}]
         }
 
         return schema
