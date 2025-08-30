@@ -1,7 +1,5 @@
 import { loadAvailableServices , ensureDiagramSaved} from './editor.js';
 
-
-
 function addGroupExtension(groupElement, values) {
   const modeling = bpmnModeler.get('modeling');
   const moddle = bpmnModeler.get('moddle');
@@ -33,7 +31,6 @@ function addGroupExtension(groupElement, values) {
     extensionElements: extensionElements
   });
 }
-
 
 
 async function saveCompositeService() {
@@ -341,13 +338,6 @@ function detectGroupMembers(groupElement) {
 
   return { components, workflow };
 }
-
-
-
-
-
-
-
 
 function findParentGroup(innerGroup) {
   const elementRegistry = bpmnModeler.get('elementRegistry');

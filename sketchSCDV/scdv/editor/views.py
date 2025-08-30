@@ -167,60 +167,184 @@ def save_cpps_service(request):
 
 from collections import OrderedDict
 
+from collections import OrderedDict
+
 def normalize_components_and_workflow(data, cpps_map):
+    """
+    Normalizza il CPPS esterno per avere un workflow del tipo:
+      - Activity_esterna -> Group_interno
+      - Group_interno   -> Activity_esterna
+    Collassa qualsiasi nodo interno (Atomic o Gateway) al relativo group_id.
+    NON risale oltre 1 livello di annidamento (voluto).
+    """
     components = data.get('components', [])
     workflow = data.get('workflow', {})
 
-    nested_atomic_ids = {
-        comp["id"]
-        for c in components if c["type"] == "CPPS"
-        for comp in cpps_map.get(c["id"], {}).get("components", [])
-        if comp["type"] == "Atomic"
-    }
+    # id -> type (per riconoscere gateway/cpps)
+    comp_type = {c["id"]: c["type"] for c in components}
 
-    filtered_components = [
-        c for c in components
-        if c["type"] != "Atomic" or c["id"] not in nested_atomic_ids
-    ]
+    # ---- Indici 1-livello sui CPPS annidati ----
+    # atomic interno -> group che lo contiene
+    atomic_to_group = {}
+    # nodo interno (atomic o gateway) -> group che lo contiene
+    node_to_group = {}
+    # per ogni group, insieme dei suoi id interni (atomic+gateway)
+    group_inner = {}
 
-    new_workflow = OrderedDict()
+    for comp in components:
+        if comp.get("type") == "CPPS":
+            gid = comp["id"]
+            inner = set()
+            nested = cpps_map.get(gid, {}).get("components", [])
+            for c in nested:
+                cid, ctype = c.get("id"), c.get("type")
+                inner.add(cid)
+                node_to_group[cid] = gid
+                if ctype == "Atomic":
+                    atomic_to_group[cid] = gid
+            group_inner[gid] = inner
 
-    # 🔧 PRIMA: inserisci Group → Primo Nodo Esterno
-    for group_id, group_doc in cpps_map.items():
-        last_atomic_ids = [
-            atomic["id"] for atomic in group_doc.get("components", [])
-            if atomic["type"] == "Atomic"
-        ]
+    nested_atomic_ids = set(atomic_to_group.keys())
+    nested_internal_ids = set(node_to_group.keys())  # atomic + gateway interni
 
-        outgoing = set()
-        for atomic_id in last_atomic_ids:
-            targets = workflow.get(atomic_id, [])
-            for t in targets:
-                if t not in nested_atomic_ids:
-                    outgoing.add(t)
-
-        if outgoing:
-            new_workflow[group_id] = list(outgoing)
-
-    # DOPO: il resto del workflow
-    for source, targets in workflow.items():
-        if source in nested_atomic_ids:
+    # ---- Filtra i componenti del CPPS esterno: rimuovi nodi interni (atomic/gateway) ----
+    filtered_components = []
+    for c in components:
+        cid, ctype = c["id"], c["type"]
+        # escludi tutto ciò che è interno a un CPPS annidato (tranne il CPPS stesso)
+        if cid in nested_internal_ids and ctype != "CPPS":
             continue
+        # escludi atomic duplicati interni
+        if ctype == "Atomic" and cid in nested_atomic_ids:
+            continue
+        filtered_components.append(c)
 
-        new_targets = []
-        for target in targets:
-            if target in nested_atomic_ids:
-                for group_id, group_doc in cpps_map.items():
-                    group_atomic_ids = [c["id"] for c in group_doc.get("components", []) if c["type"] == "Atomic"]
-                    if target in group_atomic_ids:
-                        target = group_id
-                        break
-            new_targets.append(target)
+    # ---- Costruisci workflow esterno con soli Activity->Group e Group->Activity ----
+    mapped = OrderedDict()
 
-        if new_targets:
-            new_workflow[source] = new_targets
+    def add_edge(src, tgt, store=mapped):
+        if src == tgt:
+            return  # evita self-loop
+        if src not in store:
+            store[src] = []
+        if tgt not in store[src]:
+            store[src].append(tgt)
 
-    return filtered_components, new_workflow
+    for source, targets in workflow.items():
+        if source in nested_internal_ids:
+            # Sorgente interna (atomic/gateway di un CPPS): alza a group_id (uscita del CPPS)
+            gid = node_to_group[source]
+            inner = group_inner.get(gid, set())
+            for t in targets:
+                if t in inner:
+                    continue  # interno->interno: non esce dal group
+                # mappa target che è nodo interno di altri CPPS al relativo group
+                t_mapped = node_to_group.get(t, atomic_to_group.get(t, t))
+                if t_mapped == gid:
+                    continue  # evita group -> group sullo stesso group
+                add_edge(gid, t_mapped)
+        else:
+            # Sorgente esterna: ingresso nel CPPS (collassa target interni - atomic o gateway - al loro group)
+            dedup = []
+            for t in targets:
+                t_mapped = node_to_group.get(t, atomic_to_group.get(t, t))
+                if t_mapped != source and t_mapped not in dedup:
+                    dedup.append(t_mapped)
+            for t in dedup:
+                add_edge(source, t)
+
+    # ---- Compressione leggera di gateway ESTERNI lineari (pred -> gw -> unico tgt) ----
+    predecessors = {}
+    for s, tgts in mapped.items():
+        for t in tgts:
+            predecessors.setdefault(t, set()).add(s)
+
+    compressed = OrderedDict()
+    compressed_gateways = set()
+
+    def add_c(src, tgt):
+        add_edge(src, tgt, store=compressed)
+
+    for src, tgts in mapped.items():
+        is_gateway = comp_type.get(src, '').endswith('Gateway')
+        if is_gateway:
+            preds = list(predecessors.get(src, []))
+            # uniq targets preservando l'ordine
+            uniq_tgts = []
+            for t in tgts:
+                if t not in uniq_tgts:
+                    uniq_tgts.append(t)
+            # comprimi se c'è un solo predecessore e (dopo mapping) un solo target effettivo
+            if len(preds) == 1 and len(set(uniq_tgts)) == 1:
+                add_c(preds[0], uniq_tgts[0])
+                compressed_gateways.add(src)
+                continue
+        # caso standard
+        for t in tgts:
+            add_c(src, t)
+
+    # Rimuovi i gateway compressi dai target
+    if compressed_gateways:
+        for s, tgts in list(compressed.items()):
+            new_tgts = [t for t in tgts if t not in compressed_gateways]
+            if new_tgts:
+                compressed[s] = new_tgts
+            else:
+                del compressed[s]
+
+    # ---------- FLATTEN: Group -> Atomic_interna_finale -> X  ==>  Group -> X ----------
+    # Applica finché non ci sono più casi; copre fuga di un'Atomic finale marcata come sorgente.
+    changed = True
+    while changed:
+        changed = False
+
+        # ricalcola i predecessori sul grafo corrente
+        predecessors = {}
+        for s, tgts in compressed.items():
+            for t in tgts:
+                predecessors.setdefault(t, set()).add(s)
+
+        to_delete_sources = set()
+        updates = []  # (group, old_atomic_target, new_targets_list)
+
+        for g, tgts in compressed.items():
+            # considera solo sorgenti che sono group (CPPS)
+            if g not in cpps_map:
+                continue
+            for a in list(tgts):
+                # a) 'a' è un'Atomic
+                # b) 'a' compare come sorgente
+                # c) l'unico predecessore di 'a' è proprio 'g'
+                if comp_type.get(a) == "Atomic" and a in compressed and predecessors.get(a, {None}) == {g}:
+                    # sposta g->a->T su g->T (dedup, no self-loop)
+                    new_targets = []
+                    for t in compressed[a]:
+                        if t != g and t not in tgts:
+                            new_targets.append(t)
+                    if new_targets:
+                        updates.append((g, a, new_targets))
+                        to_delete_sources.add(a)
+                        changed = True
+
+        # applica gli aggiornamenti raccolti
+        for g, a, new_targets in updates:
+            compressed[g] = [t for t in compressed[g] if t != a]
+            for t in new_targets:
+                if t not in compressed[g]:
+                    compressed[g].append(t)
+
+        # cancella le sorgenti 'a' appiattite
+        for a in to_delete_sources:
+            compressed.pop(a, None)
+
+    # Purge finale: niente self-loop e niente entry vuote
+    for s in list(compressed.keys()):
+        compressed[s] = [t for t in compressed[s] if t != s]
+        if not compressed[s]:
+            del compressed[s]
+
+    # ---- Risultato: Activity->Group e Group->Activity, senza leak di nodi interni ----
+    return filtered_components, compressed
 
 def normalize_cppn_components_and_workflow(data, cpps_map):
     """
