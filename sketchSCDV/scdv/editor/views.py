@@ -346,69 +346,152 @@ def normalize_components_and_workflow(data, cpps_map):
     # ---- Risultato: Activity->Group e Group->Activity, senza leak di nodi interni ----
     return filtered_components, compressed
 
-def normalize_cppn_components_and_workflow(data, cpps_map):
+from collections import OrderedDict
+
+def normalize_cppn_components_and_workflow(
+    data,
+    cpps_map,
+    *,
+    compress_trivial_gateways: bool = False,
+    boundary_only: bool = False,
+):
     """
-    Come normalize_components_and_workflow ma applicata a un CPPN:
-    - se nel workflow compaiono atomic appartenenti a CPPS, sostituiscili con il group_id del CPPS
-    - aggiungi archi Group_CPPS -> next esterni quando l’uscita dai CPPS va fuori
+    CPPN normalize:
+    - Mantiene i GATEWAY *esterni* (non interni a CPPS annidati).
+    - Collassa qualsiasi nodo *interno* ai CPPS (Atomic o Gateway) al relativo group_id.
+    - Opzioni:
+        compress_trivial_gateways: comprime solo gateway esterni banali (1 pred -> gw -> 1 tgt)
+        boundary_only: se True, tiene solo archi che toccano almeno un CPPS (group)
     """
-    from collections import OrderedDict
+    components = data.get("components", [])
+    workflow   = data.get("workflow", {})
 
-    components = data.get('components', [])
-    workflow = data.get('workflow', {})
+    # id -> type, set dei group (CPPS referenziati nel CPPN)
+    comp_type = {c["id"]: c["type"] for c in components}
+    groups    = {c["id"] for c in components if c.get("type") == "CPPS"}
 
-    # tutti gli atomic contenuti nei CPPS referenziati nel CPPN
-    nested_atomic_ids_by_group = {
-        gid: [c["id"] for c in doc.get("components", []) if c["type"] == "Atomic"]
-        for gid, doc in cpps_map.items()
-    }
-    nested_atomic_ids = {aid for lst in nested_atomic_ids_by_group.values() for aid in lst}
+    # ---- Indici 1-livello per i CPPS annidati ----
+    # nodo interno (atomic o gateway) -> group che lo contiene
+    node_to_group = {}
+    # per ogni group, insieme dei suoi id interni
+    group_inner = {}
+    # atomic interni (utile per chiarezza; non indispensabile separatamente)
+    nested_atomic_ids = set()
 
-    # 1) i componenti restano: Atomic / CPPS / Gateways (non togliamo Atomic “doppi” perché
-    #    nel CPPN vogliamo poterli referenziare ma verranno mappati al CPPS nel workflow)
-    new_components = components
+    for c in components:
+        if c.get("type") == "CPPS":
+            gid = c["id"]
+            inner = set()
+            nested = cpps_map.get(gid, {}).get("components", [])
+            for n in nested:
+                nid, ntype = n.get("id"), n.get("type")
+                inner.add(nid)
+                node_to_group[nid] = gid
+                if ntype == "Atomic":
+                    nested_atomic_ids.add(nid)
+            group_inner[gid] = inner
 
-    # 2) workflow normalizzato
-    new_workflow = OrderedDict()
+    nested_internal_ids = set(node_to_group.keys())  # atomic + gateway interni
 
-    # 2a) per ogni CPPS: archi "Group -> primo esterno"
-    for gid, atomic_ids in nested_atomic_ids_by_group.items():
-        outgoing = set()
-        for aid in atomic_ids:
-            for t in workflow.get(aid, []):
-                # se il target NON è interno al medesimo CPPS, è un’uscita verso l’esterno
-                if t not in nested_atomic_ids:
-                    outgoing.add(t)
-        if outgoing:
-            new_workflow[gid] = list(outgoing)
+    # ---- Filtra i componenti del CPPN: rimuovi *solo* i nodi interni ai CPPS ----
+    filtered_components = []
+    for c in components:
+        cid, ctype = c["id"], c["type"]
+        if cid in nested_internal_ids and ctype != "CPPS":
+            continue  # non far trapelare i nodi interni ai CPPS
+        filtered_components.append(c)
 
-    # 2b) resto del workflow con sostituzioni atomic-in-CPPS -> group_id
+    # ---- Costruisci il workflow tenendo i gateway ESTERNI ----
+    mapped = OrderedDict()
+
+    def add_edge(store, s, t):
+        if s == t:
+            return
+        if s not in store:
+            store[s] = []
+        if t not in store[s]:
+            store[s].append(t)
+
     for source, targets in workflow.items():
-        # se la sorgente è atomic interno a un CPPS, salta (già gestito dal "Group -> esterno")
-        if source in nested_atomic_ids:
-            continue
+        if source in nested_internal_ids:
+            # Sorgente interna a un CPPS: alza al relativo group (uscita del CPPS)
+            gid = node_to_group[source]
+            inner = group_inner.get(gid, set())
+            for t in targets:
+                if t in inner:
+                    continue  # interno->interno: resta nel CPPS, non trapela
+                # se il target è interno a QUALCHE CPPS, collassa a quel group
+                t_mapped = node_to_group.get(t, t)
+                if t_mapped == gid:
+                    continue  # evita self-loop group->group sullo stesso CPPS
+                add_edge(mapped, gid, t_mapped)
+        else:
+            # Sorgente esterna (Activity, Gateway, Group esterno): mantienila
+            dedup = []
+            for t in targets:
+                # target interno? collassa al relativo group
+                t_mapped = node_to_group.get(t, t)
+                if t_mapped != source and t_mapped not in dedup:
+                    dedup.append(t_mapped)
+            for t in dedup:
+                add_edge(mapped, source, t)
 
-        mapped_source = source
-        # se il source è interno a un CPPS, mappalo al CPPS
-        for gid, lst in nested_atomic_ids_by_group.items():
-            if source in lst:
-                mapped_source = gid
-                break
+    # ---- (opzionale) comprimi solo gateway ESTERNI banali ----
+    if compress_trivial_gateways:
+        # calcola predecessori
+        preds = {}
+        for s, tgts in mapped.items():
+            for t in tgts:
+                preds.setdefault(t, set()).add(s)
 
-        mapped_targets = []
-        for t in targets:
-            mapped_t = t
-            for gid, lst in nested_atomic_ids_by_group.items():
-                if t in lst:
-                    mapped_t = gid
-                    break
-            mapped_targets.append(mapped_t)
+        compressed = OrderedDict()
+        removed_gw = set()
 
-        if mapped_targets:
-            new_workflow[mapped_source] = mapped_targets
+        def add_c(s, t):
+            add_edge(compressed, s, t)
 
-    return new_components, new_workflow
+        for src, tgts in mapped.items():
+            is_external_gw = comp_type.get(src, "").endswith("Gateway") and (src not in nested_internal_ids)
+            uniq_tgts = []
+            for t in tgts:
+                if t not in uniq_tgts:
+                    uniq_tgts.append(t)
 
+            if is_external_gw:
+                src_preds = list(preds.get(src, []))
+                if len(src_preds) == 1 and len(uniq_tgts) == 1:
+                    add_c(src_preds[0], uniq_tgts[0])
+                    removed_gw.add(src)
+                    continue
+            for t in uniq_tgts:
+                add_c(src, t)
+
+        # purge target = gateway compresso
+        if removed_gw:
+            for s, tgts in list(compressed.items()):
+                new_t = [t for t in tgts if t not in removed_gw]
+                if new_t:
+                    compressed[s] = new_t
+                else:
+                    del compressed[s]
+        mapped = compressed
+
+    # ---- (opzionale) boundary-only: tieni solo archi che toccano almeno un CPPS ----
+    if boundary_only:
+        boundary = {}
+        for s, tgts in mapped.items():
+            keep = [t for t in tgts if (s in groups) or (t in groups)]
+            if keep:
+                boundary[s] = keep
+        mapped = boundary
+
+    # ---- pulizia finale: no self-loop, no entry vuote ----
+    for s in list(mapped.keys()):
+        mapped[s] = [t for t in mapped[s] if t != s]
+        if not mapped[s]:
+            del mapped[s]
+
+    return filtered_components, mapped
 
 @api_view(['POST'])
 def save_cppn_service(request):
