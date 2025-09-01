@@ -25,7 +25,8 @@ def upload_imported_diagram(request):
             tmp.flush()
             tmp_path = tmp.name
 
-        importer = BPMNImporterXmlBased(bpmn_path=tmp_path, name=name)
+        servers = [{"url": request.build_absolute_uri("/").rstrip("/")}]
+        importer = BPMNImporterXmlBased(bpmn_path=tmp_path, name=name, servers=servers)
         result = importer.import_all()
 
         os.remove(tmp_path)

@@ -11,30 +11,42 @@
 
   <div class="mb-3">
     <a href="{% url 'homepage' %}" class="btn btn-outline-primary me-2">Homepage</a>
-    <a href="{% url 'openapi-docs-page' %}" class="btn btn-outline-secondary">Back</a>
+    <a href="{% url 'openapi_docs:openapi-docs-page' %}" class="btn btn-outline-secondary">Back</a>
   </div>
 
-  <table class="table table-bordered table-striped table-sm">
+  <table class="table table-bordered table-striped table-sm align-middle">
     <thead class="table-dark">
       <tr>
-        <th>Doc ID</th>
-        <th>Name</th>
-        <th>Method</th>
-        <th>URL</th>
-        <th>Schema</th>
+        <th style="width: 22%">Doc ID</th>
+        <th style="width: 28%">Name</th>
+        <th style="width: 10%">Method</th>
+        <th style="width: 20%">URL</th>
+        <th style="width: 20%">Schema</th>
       </tr>
     </thead>
     <tbody>
       {% for service in services %}
         <tr>
-          <td>{{ service.task_id }}</td>
+          <td class="text-monospace">{{ service.task_id }}</td>
           <td>{{ service.name }}</td>
-          <td>{{ service.method }}</td>
-          <td>{{ service.url }}</td>
+          <td><span class="badge bg-secondary">{{ service.method }}</span></td>
+          <td><code>{{ service.url }}</code></td>
           <td>
-            <a href="{{ service.schema_url }}" target="_blank" class="btn btn-sm btn-secondary">JSON</a>
-            <a href="{% url 'swagger-viewer' task_id=service.task_id %}" target="_blank" class="btn btn-sm btn-primary">Swagger UI</a>
+            <a href="{{ service.json_url }}" target="_blank" class="btn btn-sm btn-outline-secondary me-1">JSON</a>
+            <a href="{{ service.swagger_url }}" target="_blank" class="btn btn-sm btn-primary me-1">Swagger UI</a>
+
+            <!-- Opzionale: bottone Rigenera spec -->
+            <form action="{{ service.republish_url }}" method="post" style="display:inline;">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-sm btn-warning" onclick="return confirm('Rigenerare la spec di {{ service.task_id }}?');">
+                Rigenera
+              </button>
+            </form>
           </td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="5" class="text-center text-muted py-4">Nessun Atomic trovato.</td>
         </tr>
       {% endfor %}
     </tbody>

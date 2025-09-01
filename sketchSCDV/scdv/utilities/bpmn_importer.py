@@ -9,19 +9,20 @@ from .mongodb_handler import (
     bpmn_collection,
     cpps_collection
 )
-from .openapi_generator import OpenAPIGenerator
+from openapi_docs.services import publish_atomic_spec
 from .helpers import detect_type
 from collections import OrderedDict
 
 
 class BPMNImporterXmlBased:
 
-    def __init__(self, bpmn_path, name=None):
+    def __init__(self, bpmn_path, name=None, servers=None):
         self.bpmn_path = bpmn_path
         self.diagram_id = None
         self.xml_root = None
         self.namespaces = {}
         self.provided_name = name
+        self.servers = servers or []   # es. [{"url":"http://localhost:8000"}]
 
     def parse_bpmn(self):
         tree = ET.parse(self.bpmn_path)
@@ -286,8 +287,7 @@ class BPMNImporterXmlBased:
                     }
 
                     MongoDBHandler.save_atomic(atomic_doc)
-                    openapi_doc = OpenAPIGenerator.generate_atomic_openapi(atomic_doc)
-                    MongoDBHandler.save_openapi_documentation(openapi_doc)
+                    publish_atomic_spec(service_id=task_id, servers=self.servers)
                     atomic_count += 1
                     print(f"🔹 Atomic salvato: {task_name}")
                 else:
@@ -347,8 +347,8 @@ class BPMNImporterXmlBased:
                     })
                 }
 
-                openapi_doc = OpenAPIGenerator.generate_cpps_openapi(cpps_doc, atomic_map, {})
-                MongoDBHandler.save_openapi_documentation(openapi_doc)
+                #openapi_doc = OpenAPIGenerator.generate_cpps_openapi(cpps_doc, atomic_map, {})
+                #MongoDBHandler.save_openapi_documentation(openapi_doc)
                 cpps_count += 1
                 print(f"🧩 CPPS salvato: {group_id}")
 
@@ -391,8 +391,8 @@ class BPMNImporterXmlBased:
                     })
                 }
                 cpps_map = {}
-                openapi_doc = OpenAPIGenerator.generate_cppn_openapi(cppn_doc, atomic_map, cpps_map)
-                MongoDBHandler.save_openapi_documentation(openapi_doc)
+                #openapi_doc = OpenAPIGenerator.generate_cppn_openapi(cppn_doc, atomic_map, cpps_map)
+                #MongoDBHandler.save_openapi_documentation(openapi_doc)
                 cppn_count += 1
                 print(f"🧠 CPPN salvato: {group_id}")
 

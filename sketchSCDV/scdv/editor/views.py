@@ -13,6 +13,9 @@ from django.http import JsonResponse
 from bson import ObjectId, json_util
 from bson.errors import InvalidId
 from utilities.helpers import detect_type
+from openapi_docs.services import publish_atomic_spec
+from openapi_docs.serializers import AtomicUpsertSerializer
+from django.urls import reverse
 
 def data_view_editor(request):
     return render(request, 'editor/view.html')
@@ -95,34 +98,60 @@ def parse_param_list(param_list):
 @api_view(['POST'])
 def save_atomic_service(request):
     data = request.data
-    print("===Atomic Payload received:", data)
 
-    # Genera input/output tipizzati
-    input_dict = {
-        str(v): detect_type(v)
-        for v in data.get('input_params', [])
-    }
-    output_dict = {
-        str(v): detect_type(v)
-        for v in data.get('output_params', [])
-    }
+    # 1) Genera input/output tipizzati a partire da input_params/output_params
+    data = dict(data)  # copiamo per sicurezza
+    data['input'] = { str(v): detect_type(v) for v in data.get('input_params', []) }
+    data['output'] = { str(v): detect_type(v) for v in data.get('output_params', []) }
 
-    # Aggiorna il payload con input/output già pronti
-    data['input'] = input_dict
-    data['output'] = output_dict
+    # 2) Validazione schema (DRF) per evitare payload incompleti
+    ser = AtomicUpsertSerializer(data={
+        "diagram_id": data.get("diagram_id"),
+        "task_id": data.get("task_id"),
+        "name": data.get("name"),
+        "atomic_type": data.get("atomic_type"),
+        "method": data.get("method"),
+        "url": data.get("url"),
+        "owner": data.get("owner"),
+        "input": data.get("input"),
+        "output": data.get("output"),
+    })
+    ser.is_valid(raise_exception=True)
 
-    result, status_code = MongoDBHandler.save_atomic(data)
+    # 3) Salvataggio atomic nel DB (usa i campi 'input'/'output' già tipizzati)
+    result, status_code = MongoDBHandler.save_atomic({
+        "diagram_id": data["diagram_id"],
+        "task_id": data["task_id"],
+        "name": data["name"],
+        "atomic_type": data["atomic_type"],
+        "method": data["method"],
+        "url": data["url"],
+        "owner": data["owner"],
+        "input": data["input"],
+        "output": data["output"],
+    })
 
-    if status_code in [200, 201]:
-        openapi_doc = OpenAPIGenerator.generate_atomic_openapi(data)
-        doc_result, doc_status = MongoDBHandler.save_openapi_documentation(openapi_doc)
-        print("===OpenAPI doc saved:", doc_result)
-    else:
-        doc_result, doc_status = {"message": "Atomic service not saved, skipping OpenAPI"}, 400
+    # 4) Se ok, pubblica la OpenAPI (version bump automatico)
+    if status_code in (200, 201):
+        servers = [{"url": request.build_absolute_uri("/").rstrip("/")}]
+        pub_res = publish_atomic_spec(service_id=data["task_id"], servers=servers)
 
+        # 5) Link utili per la tua UI
+        json_url = reverse("openapi_docs:atomic-oas-latest", args=[data["task_id"]])
+        swagger_url = reverse("openapi_docs:atomic-docs-latest", args=[data["task_id"]])
+
+        return Response({
+            "status": "ok",
+            "atomic_service": result,
+            "openapi_publish": pub_res,
+            "links": {"json": json_url, "swagger": swagger_url}
+        }, status=status.HTTP_201_CREATED if status_code == 201 else status.HTTP_200_OK)
+
+    # 6) Errore: non pubblichiamo la spec
     return Response({
-        "atomic_service": result,
-        "openapi_documentation": doc_result
+        "status": "error",
+        "detail": "Atomic not saved, OpenAPI skipped",
+        "atomic_service": result
     }, status=status_code)
 
 @api_view(['POST'])

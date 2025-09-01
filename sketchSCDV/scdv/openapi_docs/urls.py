@@ -1,44 +1,35 @@
+# openapi_docs/urls.py
 from django.urls import path
-from . import views
+from .views import (
+    openapi_docs_home,          # NEW
+    atomic_docs_list,           # NEW
+    atomic_upsert,
+    atomic_oas_latest,
+    atomic_oas_version,
+    atomic_republish,
+)
+
+from .views_ui import SwaggerUIView
+
+app_name = "openapi_docs"
 
 urlpatterns = [
-    path('', views.openapi_docs_page, name='openapi-docs'),
-    path('docs/openapidocs/', views.openapi_docs_page, name='openapi-docs-page'),
-    #restituisce lo schema OpenAPI di tutti i servizi atomici disponibili.
-    #È pensato per fornire una descrizione conforme a OpenAPI degli endpoint
-    #REST delle atomic services (servizi per raccolta, elaborazione, visualizzazione e condivisione dati).
-    path('schema/atomic/', views.AtomicServiceSchemaView.as_view(), name='atomic-schema'),
 
-     #restituisce lo schema OpenAPI per un servizio atomico specifico,
-    #identificato da task_id. Serve per esplorare i dettagli di un singolo servizio.
-    path('schema/atomic/<str:task_id>/', views.atomic_service_schema, name='atomic-schema-by-id'),
+    # Homepage OpenAPI
+    path("openapi_docs/", openapi_docs_home, name="openapi-docs-page"),       # NEW
 
-    #lista degli as con possibilita di vedere api in json o api in swagger
-    path('docs/atomic/', views.atomic_docs_page, name='atomic-docs-page'),
+    # Lista Atomic
+    path("openapi_docs/docs/atomic/", atomic_docs_list, name="atomic-docs"),  # NEW
 
-    #swagger view openapi di un as
-    path('docs/atomic/view/<str:task_id>/', views.swagger_viewer, name='swagger-viewer'),
+    # API Atomic
+    path("api/openapi/atomic", atomic_upsert, name="atomic-upsert"),
+    path("api/openapi/atomic/<str:service_id>/publish", atomic_republish, name="atomic-republish"),
 
-    #swagger view openapi di un cpps
-    path('schema/cpps/<str:group_id>/', views.cpps_service_schema, name='cpps-schema-by-id'),
-    
-    path('docs/cpps/view/<str:group_id>/', views.swagger_viewer_cpps, name='swagger-viewer-cpps'),
+    # JSON OpenAPI
+    path("openapi/services/<str:service_id>", atomic_oas_latest, name="atomic-oas-latest"),
+    path("openapi/services/<str:service_id>/versions/<str:version>", atomic_oas_version, name="atomic-oas-version"),
 
-
-    # Schema JSON singolo CPPS
-    path('schema/cpps/<str:group_id>/', views.cpps_service_schema, name='cpps-schema-by-id'),
- 
-    path('docs/cpps/', views.cpps_docs_page, name='cpps-docs-page'),
-    path('docs/cppn/', views.cppn_docs_page, name='cppn-docs-page'),
-
-    ##swagger view openapi di un cppn
-    path('schema/cppn/<str:group_id>/', views.cppn_service_schema, name='cppn-schema-by-id'),
-    # Swagger view openapi per CPPN
-    path('docs/cppn/view/<str:group_id>/', views.swagger_viewer_cppn, name='swagger-viewer-cppn'),
-
-  
-    # Schema JSON singolo CPPN
-    path('schema/cppn/<str:group_id>/', views.cppn_service_schema, name='cppn-schema-by-id'),
-
-    
+    # Swagger UI
+    path("docs/services/<str:service_id>", SwaggerUIView.as_view(), name="atomic-docs-latest"),
+    path("docs/services/<str:service_id>/versions/<str:version>", SwaggerUIView.as_view(), name="atomic-docs-version"),
 ]
