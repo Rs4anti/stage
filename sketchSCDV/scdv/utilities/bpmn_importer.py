@@ -45,7 +45,7 @@ class BPMNImporterXmlBased:
         print(f"✅ Diagramma salvato con ID: {self.diagram_id}")
 
 
-    def _extract_workflow(self, group_id, members):
+    def _extract_workflow_cpps(self, group_id, members):
         ns = self.namespaces
         workflow = {}
 
@@ -59,6 +59,68 @@ class BPMNImporterXmlBased:
                 workflow[source_ref].append(target_ref)
 
         return workflow
+
+    def _extract_workflow_cppn(self, group_id, members):
+        """
+        CPPN 'grezzo' in linea col frontend:
+        - SequenceFlow: source e target interni al group, escludendo Event
+        - MessageFlow: se almeno uno è interno; registriamo solo se la *sorgente* è interna (no chiavi esterne)
+        - dedup, no self-loop
+        """
+        ns = self.namespaces
+        wf = {}
+
+        # ---- helpers -----------------------------------------------------------
+        # raccogli tutti gli Event BPMN e crea un set di id
+        event_tags = [
+            "bpmn:startEvent",
+            "bpmn:endEvent",
+            "bpmn:intermediateCatchEvent",
+            "bpmn:intermediateThrowEvent",
+            "bpmn:boundaryEvent",
+        ]
+        event_ids = {
+            el.attrib.get("id")
+            for tag in event_tags
+            for el in self.xml_root.findall(f".//{tag}", ns)
+            if el.attrib.get("id")
+        }
+
+        allowed = set(members) - event_ids  # membri del group NON-evento
+
+        def add(s, t):
+            if not s or not t or s == t:
+                return
+            if s not in wf:
+                wf[s] = []
+            if t not in wf[s]:
+                wf[s].append(t)
+
+        # ---- A) SequenceFlow interni al group (no Event) ----------------------
+        for seq in self.xml_root.findall(".//bpmn:sequenceFlow", ns):
+            s = seq.attrib.get("sourceRef")
+            t = seq.attrib.get("targetRef")
+            if s in allowed and t in allowed:
+                add(s, t)
+
+        # ---- B) MessageFlow: almeno un endpoint interno; escludi Event --------
+        for mf in self.xml_root.findall(".//bpmn:messageFlow", ns):
+            s = mf.attrib.get("sourceRef")
+            t = mf.attrib.get("targetRef")
+
+            # almeno uno interno
+            if not ((s in members) or (t in members)):
+                continue
+
+            # escludi se uno dei due è un Event
+            if s in event_ids or t in event_ids:
+                continue
+
+            # registra l’arco solo se la sorgente è interna e non-evento
+            if s in allowed:
+                add(s, t)
+
+        return wf
 
     def _extract_gateways(self, members):
         ns = self.namespaces
@@ -170,7 +232,7 @@ class BPMNImporterXmlBased:
 
             if len(involved_actors) == 1:
                 actor = list(involved_actors)[0]
-                workflow = self._extract_workflow(group_id, members)
+                workflow = self._extract_workflow_cpps(group_id, members)
                 gateway_components = self._extract_gateways(members)
                 valid_task_ids = [c['id'] for c in valid_tasks]
                 components = valid_tasks + gateway_components
@@ -202,6 +264,12 @@ class BPMNImporterXmlBased:
                 print(f"🧩 CPPS salvato: {group_id}")
 
             else:
+                
+                gateway_components = self._extract_gateways(members)
+                components = [c for c in valid_tasks] + gateway_components
+                
+                workflow_cppn = self._extract_workflow_cppn(group_id, members)
+                
                 cppn_doc = {
                     "diagram_id": str(self.diagram_id),
                     "group_id": group_id,
@@ -211,7 +279,8 @@ class BPMNImporterXmlBased:
                     "actors": list(involved_actors),
                     "gdpr_map": gdpr_map,
                     "components": [c["id"] for c in valid_tasks],
-                    "group_type": "CPPN"
+                    "group_type": "CPPN",
+                    "workflow" : workflow_cppn
                 }
                 MongoDBHandler.save_cppn(cppn_doc)
 
