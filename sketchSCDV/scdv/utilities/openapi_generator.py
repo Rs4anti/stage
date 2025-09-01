@@ -75,12 +75,6 @@ class OpenAPIGenerator:
                 }
             }
         }
-
-
-
-    from collections import OrderedDict
-
-    @staticmethod
     
     @staticmethod
     def generate_cpps_openapi(doc, atomic_map, cpps_map):

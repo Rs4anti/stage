@@ -146,10 +146,10 @@ def save_cpps_service(request):
         for c in cpps_collection.find({"group_id": {"$in": cpps_ids}})
     }
 
-    # ✅ Normalizza components e workflow
+    # Normalizza components e workflow
     data["components"], data["workflow"] = normalize_components_and_workflow(data, cpps_map)
 
-    # ✅ Salva nel DB
+    # Salva nel DB
     result, status_code = MongoDBHandler.save_cpps(data)
 
     if status_code in [200, 201]:
