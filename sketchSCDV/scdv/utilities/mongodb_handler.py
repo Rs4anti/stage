@@ -19,7 +19,7 @@ class MongoDBHandler:
 
     @staticmethod
     def save_atomic(data):
-        required_fields = ['diagram_id', 'task_id', 'name', 'atomic_type', 'input_params', 'output_params', 'method', 'url', 'owner']
+        required_fields = ['diagram_id', 'task_id', 'name', 'atomic_type', 'input', 'output', 'method', 'url', 'owner']
         missing = [f for f in required_fields if f not in data]
         if missing:
             return {'error': f'Missing fields: {", ".join(missing)}'}, 400
