@@ -6,10 +6,12 @@ import json
 from .mongodb_handler import (
     MongoDBHandler,
     atomic_services_collection,
-    bpmn_collection
+    bpmn_collection,
+    cpps_collection
 )
 from .openapi_generator import OpenAPIGenerator
 from .helpers import detect_type
+from collections import OrderedDict
 
 
 class BPMNImporterXmlBased:
@@ -59,6 +61,93 @@ class BPMNImporterXmlBased:
                 workflow[source_ref].append(target_ref)
 
         return workflow
+    
+    def _detect_nested_cpps(self, outer_group_id):
+        ns = self.namespaces
+        # bounds del group esterno
+        outer = self.xml_root.find(f".//bpmndi:BPMNShape[@bpmnElement='{outer_group_id}']", ns)
+        if outer is None:
+            return []
+        ob = outer.find("dc:Bounds", ns)
+        gx, gy, gw, gh = map(float, (ob.attrib["x"], ob.attrib["y"], ob.attrib["width"], ob.attrib["height"]))
+
+        nested = []
+        for shp in self.xml_root.findall(".//bpmndi:BPMNShape", ns):
+            gid = shp.attrib.get("bpmnElement", "")
+            if not gid.startswith("Group_") or gid == outer_group_id:
+                continue
+            b = shp.find("dc:Bounds", ns)
+            if b is None:
+                continue
+            x, y = float(b.attrib["x"]), float(b.attrib["y"])
+            # dentro al rettangolo dell’outer?
+            if not (gx <= x <= gx+gw and gy <= y <= gy+gh):
+                continue
+
+            # è davvero un CPPS? guarda l’estensione custom
+            ext = self.xml_root.find(f".//bpmn:group[@id='{gid}']/bpmn:extensionElements/custom:groupExtension", ns)
+            gtype = ext.find("custom:groupType", ns).text.strip() if ext is not None and ext.find("custom:groupType", ns) is not None else ""
+            if gtype == "CPPS":
+                nested.append(gid)
+
+        return nested
+
+    from collections import OrderedDict
+
+    def _collapse_cppn_to_groups(self, components, workflow, cpps_map):
+        """
+        Collassa i nodi interni (Atomic + Gateway) dei CPPS annidati al rispettivo group_id.
+        Mantiene gateway ESTERNI, rimuove archi interni->interni allo stesso CPPS.
+        """
+        # indice: nodo interno -> suo CPPS
+        node_to_group = {}
+        group_inner = {}
+
+        for gid, cpps_doc in cpps_map.items():
+            inner_ids = {c["id"] for c in cpps_doc.get("components", [])}
+            group_inner[gid] = inner_ids
+            for nid in inner_ids:
+                node_to_group[nid] = gid
+
+        nested_internal = set(node_to_group.keys())  # atomic + gateway interni
+
+        # 3a) filtra i componenti del CPPN: niente leak di nodi interni
+        filtered_components = []
+        for c in components:
+            cid, ctype = c["id"], c["type"]
+            if cid in nested_internal and ctype != "CPPS":
+                continue
+            filtered_components.append(c)
+
+        # 3b) mappa gli archi
+        collapsed = OrderedDict()
+        def add(s, t):
+            if s == t: return
+            collapsed.setdefault(s, [])
+            if t not in collapsed[s]:
+                collapsed[s].append(t)
+
+        for s, tgts in workflow.items():
+            s2 = node_to_group.get(s, s)
+            inner_s = group_inner.get(s2, set()) if s2 in group_inner else set()
+            for t in tgts:
+                t2 = node_to_group.get(t, t)
+                # se entrambi mappano allo stesso CPPS, è un arco interno: scarta
+                if s2 == t2 and s2 in group_inner:
+                    continue
+                # se la sorgente era interna e il target interno allo stesso CPPS: scarta
+                if s in nested_internal and t in inner_s:
+                    continue
+                add(s2, t2)
+
+        # pulizia
+        for k in list(collapsed.keys()):
+            collapsed[k] = [t for t in collapsed[k] if t != k]
+            if not collapsed[k]:
+                del collapsed[k]
+
+        return filtered_components, collapsed
+
 
     def _extract_workflow_cppn(self, group_id, members):
         """
@@ -266,10 +355,22 @@ class BPMNImporterXmlBased:
             else:
                 
                 gateway_components = self._extract_gateways(members)
-                components = [c for c in valid_tasks] + gateway_components
-                
-                workflow_cppn = self._extract_workflow_cppn(group_id, members)
-                
+                # aggiungi i CPPS annidati come componenti del CPPN
+                nested_cpps_ids = self._detect_nested_cpps(group_id)
+                nested_cpps_components = [{"id": gid, "type": "CPPS"} for gid in nested_cpps_ids]
+
+                # componenti COMPLETI del CPPN (Atomic + Gateway + CPPS)
+                components_cppn = valid_tasks + gateway_components + nested_cpps_components
+
+                # workflow “grezzo” (sequence interni + message flow, senza eventi)
+                workflow_raw = self._extract_workflow_cppn(group_id, members)  # già ce l’hai :contentReference[oaicite:3]{index=3}
+
+                # mappa dei CPPS annidati (serve a sapere quali id sono interni a ciascun group)
+                cpps_map = { c["group_id"]: c for c in cpps_collection.find({"group_id": {"$in": nested_cpps_ids}}) }
+
+                # COLLASSO
+                components_norm, workflow_norm = self._collapse_cppn_to_groups(components_cppn, workflow_raw, cpps_map)
+
                 cppn_doc = {
                     "diagram_id": str(self.diagram_id),
                     "group_id": group_id,
@@ -278,9 +379,9 @@ class BPMNImporterXmlBased:
                     "workflow_type": workflow_type,
                     "actors": list(involved_actors),
                     "gdpr_map": gdpr_map,
-                    "components": [c["id"] for c in valid_tasks],
+                    "components": components_norm,
                     "group_type": "CPPN",
-                    "workflow" : workflow_cppn
+                    "workflow" : workflow_norm
                 }
                 MongoDBHandler.save_cppn(cppn_doc)
 
