@@ -1,3 +1,6 @@
+from typing import Dict, Any, List
+from utilities.mongodb_handler import openapi_collection
+
 class OpenAPIGenerator:
     """
     Genera una OpenAPI 3.1 per un Atomic Service a partire dal documento atomic:
@@ -87,4 +90,207 @@ class OpenAPIGenerator:
             },
             "security": [{"bearerAuth": []}]
         }
+        return oas
+    
+    @staticmethod
+    def _mk_cpps_input_schema_minimal() -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "params": {"type": "object", "additionalProperties": True},
+                "context": {"type": "object", "additionalProperties": True},
+            },
+            "required": ["params"]
+        }
+
+    @staticmethod
+    def _mk_cpps_output_schema_minimal() -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "status": {"type": "string", "enum": ["OK", "ERROR"]},
+                "results": {"type": "object", "additionalProperties": True},
+                "trace": {"type": "array", "items": {"type": "object"}}
+            },
+            "required": ["status"]
+        }
+    
+    @staticmethod
+    def _parse_semver(v: str) -> tuple[int, int, int]:
+        try:
+            M, m, p = v.split(".")
+            return (int(M), int(m), int(p))
+        except Exception:
+            return (0, 0, 0)
+
+    @staticmethod
+    def _latest_atomic_oas(service_id: str) -> dict | None:
+        """
+        Cerca tra le atomic OAS pubblicate quella con versione semver più alta per service_id.
+        """
+        cur = openapi_collection.find(
+            {"level": "atomic", "service_id": service_id, "status": "published"},
+            {"_id": 0, "version": 1, "oas": 1}
+        )
+        best = None
+        best_t = (-1, -1, -1)
+        for d in cur:
+            v = d.get("version")
+            t = OpenAPIGenerator._parse_semver(v or "")
+            if t > best_t:
+                best_t = t
+                best = d
+        return best["oas"] if best else None
+
+    @staticmethod
+    def _mk_fallback_atomic_in() -> Dict[str, Any]:
+        return {"type": "object", "additionalProperties": True}
+
+    @staticmethod
+    def _mk_fallback_atomic_out() -> Dict[str, Any]:
+        return {"type": "object", "additionalProperties": True}
+
+    @staticmethod
+    def generate_cpps_openapi(doc: dict, version: str = "1.0.0") -> dict:
+        group_id = doc["group_id"]
+
+        # --- operations invarianti ---
+        get_op = {
+            "summary": "Get CPPS definition",
+            "responses": {
+                "200": {
+                    "description": "Definition",
+                    "content": {
+                        "application/json": {
+                            "schema": {"$ref": "#/components/schemas/CPPSMeta"}
+                        }
+                    }
+                }
+            }
+        }
+
+        post_op = {
+            "summary": "Invoke CPPS workflow",
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {"$ref": "#/components/schemas/CPPSInput"},
+                        "examples": {"default": {"value": {"params": {}, "context": {}}}}
+                    }
+                }
+            },
+            "responses": {
+                "200": {
+                    "description": "Execution result",
+                    "content": {
+                        "application/json": {
+                            "schema": {"$ref": "#/components/schemas/CPPSOutput"}
+                        }
+                    }
+                }
+            }
+        }
+
+        oas = {
+            "openapi": "3.1.0",
+            "jsonSchemaDialect": "https://spec.openapis.org/oas/3.1/dialect/base",
+            "info": {
+                "title": doc["name"],
+                "version": version,
+                "description": doc.get("description", ""),
+                "x-service-type": "CPPS",
+                "x-layer": "CPPS",
+                "x-group_id": group_id,
+                "x-diagram_id": doc.get("diagram_id"),
+                "x-owner": doc.get("owner"),
+                "x-workflow-type": doc.get("workflow_type"),
+                "x-components": doc.get("components", []),
+            },
+            "paths": {
+                f"/cpps/{group_id}": {"get": get_op},
+                f"/cpps/{group_id}/invoke": {"post": post_op},
+            },
+            "components": {
+                "securitySchemes": {
+                    "bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}
+                },
+                "schemas": {
+                    "CPPSMeta": {
+                        "type": "object",
+                        "properties": {
+                            "group_id": {"type": "string", "const": group_id},
+                            "name": {"type": "string"},
+                            "owner": {"type": "string"},
+                            "workflow_type": {"type": "string"},
+                            "components": {"type": "array", "items": {"type": "object"}},
+                        },
+                        "required": ["group_id", "name", "components"]
+                    },
+                    # placeholder minimi, saranno sovrascritti sotto
+                    "CPPSInput": {
+                        "type": "object",
+                        "properties": {
+                            "params": {"type": "object", "additionalProperties": True},
+                            "context": {"type": "object", "additionalProperties": True}
+                        },
+                        "required": ["params"]
+                    },
+                    "CPPSOutput": {
+                        "type": "object",
+                        "properties": {
+                            "status": {"type": "string", "enum": ["OK", "ERROR"]},
+                            "results": {"type": "object", "additionalProperties": True},
+                            "trace": {"type": "array", "items": {"type": "object"}}
+                        },
+                        "required": ["status"]
+                    }
+                }
+            },
+            "security": [{"bearerAuth": []}]
+        }
+
+        # --------- ARRICCHIMENTO: comporre schemi dagli Atomic ----------
+        inputs: Dict[str, Any] = {}
+        outputs: Dict[str, Any] = {}
+
+        for comp in doc.get("components", []):
+            if comp.get("type") != "Atomic":
+                # (eventuale estensione: se CPPS nested, potresti comporre ricorsivamente)
+                continue
+            sid = comp["id"]
+            atomic_oas = OpenAPIGenerator._latest_atomic_oas(sid)
+            if atomic_oas:
+                schemas = (atomic_oas.get("components") or {}).get("schemas") or {}
+                ain = schemas.get("AtomicInput") or OpenAPIGenerator._mk_fallback_atomic_in()
+                aout = schemas.get("AtomicOutput") or OpenAPIGenerator._mk_fallback_atomic_out()
+            else:
+                ain = OpenAPIGenerator._mk_fallback_atomic_in()
+                aout = OpenAPIGenerator._mk_fallback_atomic_out()
+
+            inputs[sid] = ain
+            outputs[sid] = aout
+
+        if inputs:
+            oas["components"]["schemas"]["CPPSInput"] = {
+                "type": "object",
+                "properties": {k: v for k, v in inputs.items()},
+                "additionalProperties": False
+            }
+
+        if outputs:
+            oas["components"]["schemas"]["CPPSOutput"] = {
+                "type": "object",
+                "properties": {
+                    "status": {"type": "string", "enum": ["OK", "ERROR"]},
+                    "results": {
+                        "type": "object",
+                        "properties": {k: v for k, v in outputs.items()},
+                        "additionalProperties": False
+                    },
+                    "trace": {"type": "array", "items": {"type": "object"}}
+                },
+                "required": ["status"]
+            }
+
         return oas

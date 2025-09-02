@@ -18,3 +18,31 @@ class SwaggerUIView(TemplateView):
             args=[service_id]
         )
         return ctx
+    
+class SwaggerUIViewCPPS(TemplateView):
+    """
+    Mostra Swagger UI per un CPPS.
+    - /openapi_docs/docs/cpps/<group_id>         -> latest
+    - /openapi_docs/docs/cpps/<group_id>/versions/<version> -> specifica versione
+    Il template usato è lo stesso che usi per gli Atomic: swagger_ui.html
+    Si aspetta una variabile 'spec_url' nel context.
+    """
+    template_name = "openapi_docs/swagger_ui.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        group_id = self.kwargs["group_id"]
+        version = self.kwargs.get("version")
+
+        if version:
+            ctx["spec_url"] = reverse(
+                "openapi_docs:cpps-oas-version", args=[group_id, version]
+            )
+            ctx["page_title"] = f"CPPS {group_id} – Swagger (v{version})"
+        else:
+            ctx["spec_url"] = reverse(
+                "openapi_docs:cpps-oas-latest", args=[group_id]
+            )
+            ctx["page_title"] = f"CPPS {group_id} – Swagger"
+
+        return ctx

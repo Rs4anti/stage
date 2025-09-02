@@ -1,10 +1,10 @@
 # openapi_docs/services.py
+from __future__ import annotations
 import hashlib, json
 from datetime import datetime
 from typing import Optional, Tuple
-
 # riuso diretto delle collection dal tuo modulo
-from utilities.mongodb_handler import atomic_services_collection, openapi_collection
+from utilities.mongodb_handler import atomic_services_collection, cpps_collection, openapi_collection
 
 from openapi_docs.openapi_generator import OpenAPIGenerator
 from openapi_docs.oas_validation import validate_openapi
@@ -151,3 +151,97 @@ def republish_atomic_spec(service_id: str, servers: list|None=None) -> dict:
     })
     return {"status": "ok", "service_id": service_id, "version": version}
 
+# Versioning CPPS
+# ------------------------------------------------------------
+def _latest_published_cpps_version(group_id: str) -> Optional[str]:
+    cur = openapi_collection.find(
+        {"level": "cpps", "group_id": group_id, "status": "published"},
+        {"version": 1, "_id": 0}
+    )
+    best_v, best_t = None, (-1, -1, -1)
+    for d in cur:
+        v = d.get("version")
+        if not v:
+            continue
+        t = _parse_semver(v)
+        if t > best_t:
+            best_t, best_v = t, v
+    return best_v
+
+# ------------------------------------------------------------
+# Upsert documento CPPS (Mongo: cpps_collection)
+# ------------------------------------------------------------
+def upsert_cpps(doc: dict) -> dict:
+    """
+    Allinea/salva il documento CPPS in cpps_collection.
+    """
+    cpps_collection.update_one(
+        {"group_id": doc["group_id"]},
+        {
+            "$set": {
+                "diagram_id": doc["diagram_id"],
+                "name": doc["name"],
+                "description": doc.get("description"),
+                "owner": doc["owner"],
+                "group_type": doc.get("group_type", "CPPS"),
+                "components": doc.get("components", []),
+                "workflow": doc.get("workflow", {}),
+                "workflow_type": doc.get("workflow_type", "sequence"),
+                "endpoints": doc.get("endpoints", []),
+                "updated_at": _now_iso(),
+            },
+            "$setOnInsert": {"created_at": _now_iso()},
+        },
+        upsert=True,
+    )
+    # torna il doc senza _id per uso immediato
+    return cpps_collection.find_one({"group_id": doc["group_id"]}, {"_id": 0})
+
+# ------------------------------------------------------------
+# Publish / Republish CPPS OpenAPI (openapi_collection)
+# ------------------------------------------------------------
+def publish_cpps_spec(group_id: str, servers: list | None = None) -> dict:
+    """
+    Genera OpenAPI 3.1 per il CPPS e la salva in openapi_collection con status=published.
+    Versioning: patch bump su latest.
+    """
+    cpps = cpps_collection.find_one({"group_id": group_id})
+    if not cpps:
+        return {"status": "error", "detail": "CPPS not found"}
+
+    base = _latest_published_cpps_version(group_id)
+    version = _bump_patch(base)
+
+    # Genera OAS
+    oas = OpenAPIGenerator.generate_cpps_openapi(cpps, version=version)
+    if servers:
+        oas["servers"] = servers
+
+    # Valida
+    ok, errs = validate_openapi(oas)
+    if not ok:
+        return {"status": "error", "errors": errs}
+
+    # Persisti OAS
+    openapi_collection.insert_one({
+        "level": "cpps",
+        "group_id": group_id,
+        "diagram_id": cpps.get("diagram_id"),
+        "owner": cpps.get("owner"),
+        "name": cpps.get("name"),
+        "version": version,
+        "status": "published",
+        "hash": _sha256(oas),
+        "created_at": _now_iso(),
+        "updated_at": _now_iso(),
+        "oas": oas,
+        "meta": {"source": "generator", "tags": []},
+    })
+
+    return {"status": "ok", "group_id": group_id, "version": version}
+
+def republish_cpps_spec(group_id: str, servers: list | None = None) -> dict:
+    """
+    Per semplicità, republish = nuova publish con patch bump (come atomic).
+    """
+    return publish_cpps_spec(group_id, servers=servers)

@@ -11,7 +11,7 @@
 
   <div class="mb-3">
     <a href="{% url 'homepage' %}" class="btn btn-outline-primary me-2">Homepage</a>
-    <a href="{% url 'openapi-docs-page' %}" class="btn btn-outline-secondary">Back</a>
+    <a href="{% url 'openapi_docs:openapi-docs-page' %}" class="btn btn-outline-secondary">Back</a>
   </div>
 
   <table class="table table-bordered table-striped table-sm">
@@ -31,7 +31,7 @@
           <td>{{ service.actor }}</td>
           <td>
             <a href="{{ service.schema_url }}" target="_blank" class="btn btn-sm btn-secondary">JSON</a>
-            <a href="{% url 'swagger-viewer-cpps' group_id=service.group_id %}" target="_blank" class="btn btn-sm btn-primary">Swagger UI</a>
+            <a href="{% url 'openapi_docs:swagger-viewer-cpps' group_id=service.group_id %}" target="_blank" class="btn btn-sm btn-primary">Swagger UI</a>
           </td>
         </tr>
       {% endfor %}

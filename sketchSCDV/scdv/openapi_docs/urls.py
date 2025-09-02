@@ -9,6 +9,15 @@ from .views import (
     atomic_republish,
 )
 
+from .views import (           # <-- arriveranno allo Step 5
+    cpps_upsert,
+    cpps_oas_latest,
+    cpps_oas_version,
+    cpps_republish,
+    cpps_docs_list,
+)
+from .views_ui import SwaggerUIViewCPPS
+
 from .views_ui import SwaggerUIView
 
 app_name = "openapi_docs"
@@ -32,4 +41,47 @@ urlpatterns = [
     # Swagger UI
     path("docs/services/<str:service_id>", SwaggerUIView.as_view(), name="atomic-docs-latest"),
     path("docs/services/<str:service_id>/versions/<str:version>", SwaggerUIView.as_view(), name="atomic-docs-version"),
+
+    # ----- CPPS: pagina elenco con link JSON e Swagger -----
+    path(
+        "openapi_docs/docs/cpps/",
+        cpps_docs_list,
+        name="cpps-docs",
+    ),
+
+    # ----- CPPS: API per upsert & publish -----
+    path(
+        "openapi_docs/api/openapi/cpps",
+        cpps_upsert,
+        name="cpps-upsert",
+    ),
+    path(
+        "openapi_docs/api/openapi/cpps/<str:group_id>/publish",
+        cpps_republish,
+        name="cpps-republish",
+    ),
+
+    # ----- CPPS: JSON OpenAPI (latest & by-version) -----
+    path(
+        "openapi_docs/openapi/cpps/<str:group_id>",
+        cpps_oas_latest,
+        name="cpps-oas-latest",
+    ),
+    path(
+        "openapi_docs/openapi/cpps/<str:group_id>/versions/<str:version>",
+        cpps_oas_version,
+        name="cpps-oas-version",
+    ),
+
+    # ----- CPPS: Swagger UI -----
+    path(
+        "openapi_docs/docs/cpps/<str:group_id>",
+        SwaggerUIViewCPPS.as_view(),
+        name="swagger-viewer-cpps",
+    ),
+    path(
+        "openapi_docs/docs/cpps/<str:group_id>/versions/<str:version>",
+        SwaggerUIViewCPPS.as_view(),
+        name="swagger-viewer-cpps-version",
+    ),
 ]

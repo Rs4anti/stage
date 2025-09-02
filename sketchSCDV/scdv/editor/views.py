@@ -13,8 +13,8 @@ from django.http import JsonResponse
 from bson import ObjectId, json_util
 from bson.errors import InvalidId
 from utilities.helpers import detect_type
-from openapi_docs.services import publish_atomic_spec
-from openapi_docs.serializers import AtomicUpsertSerializer
+from openapi_docs.services import publish_atomic_spec, upsert_cpps, publish_cpps_spec
+from openapi_docs.serializers import AtomicUpsertSerializer, CPPSUpsertSerializer
 from django.urls import reverse
 
 def data_view_editor(request):
@@ -193,8 +193,6 @@ def save_cpps_service(request):
         "cpps_service": result,
         "openapi_documentation": doc_result
     }, status=status_code)
-
-from collections import OrderedDict
 
 from collections import OrderedDict
 
