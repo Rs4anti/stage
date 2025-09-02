@@ -177,15 +177,23 @@ def save_cpps_service(request):
 
     # Normalizza components e workflow
     data["components"], data["workflow"] = normalize_components_and_workflow(data, cpps_map)
-
+    
     # Salva nel DB
     result, status_code = MongoDBHandler.save_cpps(data)
 
     if status_code in [200, 201]:
-        # Genera OpenAPI
-        openapi_doc = OpenAPIGenerator.generate_cpps_openapi(data, atomic_map, cpps_map)
-        doc_result, doc_status = MongoDBHandler.save_openapi_documentation(openapi_doc)
-        print("===OpenAPI doc saved:", doc_result)
+        # Genera e pubblica OpenAPI
+        servers = [{"url": request.build_absolute_uri("/").rstrip("/")}]
+        pub_res = publish_cpps_spec(group_id=data["group_id"], servers=servers)
+
+        if pub_res.get("status") == "ok":
+            doc_result, doc_status = pub_res, 201
+            print("===OpenAPI doc published:", pub_res)
+        else:
+            doc_result, doc_status = {
+                "message": "OpenAPI publish failed",
+                "errors": pub_res.get("errors")
+            }, 400
     else:
         doc_result, doc_status = {"message": "CPPS not saved, skipping OpenAPI"}, 400
 

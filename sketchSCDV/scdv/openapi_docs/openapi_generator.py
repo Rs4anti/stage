@@ -93,29 +93,6 @@ class OpenAPIGenerator:
         return oas
     
     @staticmethod
-    def _mk_cpps_input_schema_minimal() -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "params": {"type": "object", "additionalProperties": True},
-                "context": {"type": "object", "additionalProperties": True},
-            },
-            "required": ["params"]
-        }
-
-    @staticmethod
-    def _mk_cpps_output_schema_minimal() -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "status": {"type": "string", "enum": ["OK", "ERROR"]},
-                "results": {"type": "object", "additionalProperties": True},
-                "trace": {"type": "array", "items": {"type": "object"}}
-            },
-            "required": ["status"]
-        }
-    
-    @staticmethod
     def _parse_semver(v: str) -> tuple[int, int, int]:
         try:
             M, m, p = v.split(".")
@@ -153,16 +130,37 @@ class OpenAPIGenerator:
     @staticmethod
     def generate_cpps_openapi(doc: dict, version: str = "1.0.0") -> dict:
         group_id = doc["group_id"]
+        
+        meta_value = {
+            "group_id": group_id,
+            "name": doc.get("name"),
+            "owner": doc.get("owner"),
+            "description": doc.get("description"),
+            "diagram_id": doc.get("diagram_id"),
+            "group_type": doc.get("group_type", "CPPS"),
+            "workflow_type": doc.get("workflow_type"),
+            "workflow": doc.get("workflow", {}),
+            "components": doc.get("components", []),
+            "endpoints": doc.get("endpoints", []),
+        }
 
         # --- operations invarianti ---
         get_op = {
             "summary": "Get CPPS definition",
+            "tags": ["Definition"],
+            "operationId": f"cpps_get_{group_id}",
             "responses": {
                 "200": {
                     "description": "Definition",
                     "content": {
                         "application/json": {
-                            "schema": {"$ref": "#/components/schemas/CPPSMeta"}
+                            "schema": {"$ref": "#/components/schemas/CPPSMeta"},
+                            "examples": {
+                                "current": {
+                                    "summary": "Current CPPS metadata",
+                                    "value": meta_value
+                                }
+                            }
                         }
                     }
                 }
@@ -216,18 +214,55 @@ class OpenAPIGenerator:
                     "bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}
                 },
                 "schemas": {
-                    "CPPSMeta": {
+                     # --- NEW ---
+            "CPPSComponent": {
+                "type": "object",
+                "properties": {
+                    "id":   {"type": "string"},
+                    "type": {"type": "string", "enum": ["Atomic", "CPPS", "External"]}
+                },
+                "required": ["id", "type"]
+            },
+            "CPPSEndpoint": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "url": {"type": "string", "format": "uri"},
+                    "method": {"type": "string", "enum": ["GET","POST","PUT","PATCH","DELETE"]},
+                    "description": {"type": "string"}
+                },
+                "required": ["url", "method"]
+            },
+            "CPPSMeta": {
+                "type": "object",
+                "properties": {
+                    "group_id":     {"type": "string", "const": group_id},
+                    "name":         {"type": "string" },
+                    "owner":        {"type": "string"},
+                    "description":  {"type": "string"},
+                    "diagram_id":   {"type": "string"},
+                    "group_type":   {"type": "string", "const": "CPPS"},
+                    "workflow_type":{"type": "string", "enum": ["sequence","parallel","custom"]},
+                    "workflow": {
                         "type": "object",
-                        "properties": {
-                            "group_id": {"type": "string", "const": group_id},
-                            "name": {"type": "string"},
-                            "owner": {"type": "string"},
-                            "workflow_type": {"type": "string"},
-                            "components": {"type": "array", "items": {"type": "object"}},
+                        "additionalProperties": {
+                            "type": "array",
+                            "items": {"type": "string"}
                         },
-                        "required": ["group_id", "name", "components"]
+                        "description": "Adjacency list: { nodeId: [nextNodeId, ...] }"
                     },
-                    # placeholder minimi, saranno sovrascritti sotto
+                    "components": {
+                        "type": "array",
+                        "items": {"$ref": "#/components/schemas/CPPSComponent"}
+                    },
+                    "endpoints": {
+                        "type": "array",
+                        "items": {"$ref": "#/components/schemas/CPPSEndpoint"}
+                    }
+                },
+                "required": ["group_id", "name", "components"]
+            },
+            # --- restano come prima; verranno arricchiti sotto ---
                     "CPPSInput": {
                         "type": "object",
                         "properties": {
@@ -292,5 +327,7 @@ class OpenAPIGenerator:
                 },
                 "required": ["status"]
             }
+
+        oas["components"]["schemas"]["CPPSMeta"]["examples"] = [meta_value]
 
         return oas

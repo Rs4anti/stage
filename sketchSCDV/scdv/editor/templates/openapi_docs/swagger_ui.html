@@ -13,13 +13,47 @@
   <div id="swagger-ui"></div>
   <script src="https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js"></script>
   <script>
-    window.ui = SwaggerUIBundle({
+  function renderInfoExtensions(ui) {
+    try {
+      const spec = ui.specSelectors.specJson().toJS();
+      const entries = Object.entries(spec.info || {}).filter(([k]) => k.startsWith('x-'));
+      if (!entries.length) return;
+
+      // crea una tabellina
+      const rows = entries.map(([k, v]) => {
+        const val = typeof v === 'object' ? JSON.stringify(v, null, 2) : String(v);
+        return `<tr><th style="text-align:left;vertical-align:top;padding:4px 8px;">${k}</th>
+                <td style="padding:4px 8px;"><pre style="margin:0">${val}</pre></td></tr>`;
+      }).join("");
+
+      const html = `
+        <div class="info-extensions" style="margin:16px 0;">
+          <h4 style="margin:0 0 8px 0;">Extensions</h4>
+          <table>${rows}</table>
+        </div>`;
+
+      // attacca sotto al blocco info
+      const infoBlock = document.querySelector('#swagger-ui .information-container, #swagger-ui section .info');
+      if (infoBlock && !document.querySelector('#swagger-ui .info-extensions')) {
+        infoBlock.insertAdjacentHTML('beforeend', html);
+      }
+    } catch(e) { /* no-op */ }
+  }
+
+  window.onload = function() {
+    const ui = SwaggerUIBundle({
       url: "{{ spec_url }}",
       dom_id: '#swagger-ui',
       deepLinking: true,
+      showExtensions: true,
+      showCommonExtensions: true,
       presets: [SwaggerUIBundle.presets.apis],
-      layout: "BaseLayout"
+      layout: "BaseLayout",
+      onComplete: function() { renderInfoExtensions(ui); }
     });
-  </script>
+    window.ui = ui;
+  }
+</script>
+
 </body>
 </html>
