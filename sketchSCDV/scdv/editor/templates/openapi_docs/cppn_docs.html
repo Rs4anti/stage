@@ -10,7 +10,7 @@
   <h2 class="mb-4">CPPN Services – Documentation</h2>
   <div class="mb-3">
     <a href="{% url 'homepage' %}" class="btn btn-outline-primary me-2">Homepage</a>
-    <a href="{% url 'openapi-docs-page' %}" class="btn btn-outline-secondary">Back</a>
+    <a href="{% url 'openapi_docs:openapi-docs-page' %}" class="btn btn-outline-secondary">Back</a>
   </div>
 
   <table class="table table-bordered table-striped table-sm">
@@ -27,10 +27,10 @@
         <tr>
           <td>{{ service.group_id }}</td>
           <td>{{ service.name }}</td>
-          <td>{{ service.actors|join:", " }}</td>
+          <td>{{ service.actors}}</td>
           <td>
             <a href="{{ service.schema_url }}" target="_blank" class="btn btn-sm btn-secondary">JSON</a>
-            <a href="{% url 'swagger-viewer-cppn' group_id=service.group_id %}" target="_blank" class="btn btn-sm btn-primary">Swagger UI</a>
+            <a href="{% url 'openapi_docs:swagger-viewer-cppn' group_id=service.group_id %}" target="_blank" class="btn btn-sm btn-primary">Swagger UI</a>
           </td>
         </tr>
       {% endfor %}

@@ -331,3 +331,172 @@ class OpenAPIGenerator:
         oas["components"]["schemas"]["CPPSMeta"]["examples"] = [meta_value]
 
         return oas
+    
+
+    @staticmethod
+    def _latest_cpps_oas(group_id: str) -> dict | None:
+        cur = openapi_collection.find(
+            {"level":"cpps", "group_id": group_id, "status":"published"},
+            {"_id":0,"version":1,"oas":1}
+        )
+        best, best_t = None, (-1,-1,-1)
+        for d in cur:
+            t = OpenAPIGenerator._parse_semver(d.get("version") or "")
+            if t > best_t:
+                best_t, best = t, d
+        return best["oas"] if best else None
+
+    @staticmethod
+    def _mk_fallback_obj() -> Dict[str, Any]:
+        return {"type":"object","additionalProperties": True}
+
+    @staticmethod
+    def generate_cppn_openapi(doc: dict, version: str="1.0.0") -> dict:
+        gid = doc["group_id"]
+        # meta per example
+        meta_value = {
+            "group_id": gid,
+            "name": doc.get("name"),
+            "description": doc.get("description"),
+            "diagram_id": doc.get("diagram_id"),
+            "group_type": "CPPN",
+            "workflow_type": doc.get("workflow_type"),
+            "actors": doc.get("actors", []),
+            "gdpr_map": doc.get("gdpr_map", {}),
+            "workflow": doc.get("workflow", {}),
+            "components": doc.get("components", []),
+            "endpoints": doc.get("endpoints", []),
+        }
+
+        get_op = {
+            "summary": "Get CPPN definition",
+            "tags": ["Definition"],
+            "operationId": f"cppn_get_{gid}",
+            "responses": {
+                "200": {"description": "Definition",
+                    "content": {"application/json":{
+                        "schema": {"$ref":"#/components/schemas/CPPNMeta"},
+                        "examples":{"current":{"value": meta_value}}
+                    }}
+                }
+            }
+        }
+
+        post_op = {
+            "summary": "Invoke CPPN orchestration",
+            "tags": ["Execution"],
+            "operationId": f"cppn_invoke_{gid}",
+            "requestBody": {"required": True, "content":{
+                "application/json": {"schema":{"$ref":"#/components/schemas/CPPNInput"}}
+            }},
+            "responses": {"200":{"description":"Result","content":{
+                "application/json": {"schema":{"$ref":"#/components/schemas/CPPNOutput"}}
+            }}}
+        }
+
+        oas = {
+            "openapi": "3.1.0",
+            "jsonSchemaDialect": "https://spec.openapis.org/oas/3.1/dialect/base",
+            "info": {
+                "title": doc["name"],
+                "version": version,
+                "description": doc.get("description",""),
+                "x-layer": "CPPN",
+                "x-service-type": "CPPN",
+                "x-group_id": gid,
+                "x-diagram_id": doc.get("diagram_id"),
+                "x-actors": doc.get("actors", []),
+                "x-gdpr_map": doc.get("gdpr_map", {}),
+                "x-workflow-type": doc.get("workflow_type"),
+                "x-components": doc.get("components", []),
+            },
+            "paths": {
+                f"/cppn/{gid}": {"get": get_op},
+                f"/cppn/{gid}/invoke": {"post": post_op},
+            },
+            "components": {
+                "securitySchemes": {
+                    "bearerAuth": {"type":"http","scheme":"bearer","bearerFormat":"JWT"}
+                },
+                "schemas": {
+                    "CPPNComponent": {
+                        "type":"object",
+                        "properties":{
+                            "id":{"type":"string"},
+                            "type":{"type":"string","enum":["Atomic","CPPS","External","ParallelGateway"]},
+                            "targets":{"type":"array","items":{"type":"string"}}
+                        },
+                        "required":["id","type"],
+                        "additionalProperties": False
+                    },
+                    "CPPNMeta": {
+                        "type":"object",
+                        "properties":{
+                            "group_id":{"type":"string","const": gid},
+                            "name":{"type":"string"},
+                            "description":{"type":"string"},
+                            "diagram_id":{"type":"string"},
+                            "group_type":{"type":"string","const":"CPPN"},
+                            "workflow_type":{"type":"string","enum":["sequence","parallel","custom"]},
+                            "actors":{"type":"array","items":{"type":"string"}},
+                            "gdpr_map":{"type":"object","additionalProperties":{"type":"string"}},
+                            "workflow":{
+                                "type":"object",
+                                "additionalProperties":{"type":"array","items":{"type":"string"}}
+                            },
+                            "components":{"type":"array","items":{"$ref":"#/components/schemas/CPPNComponent"}},
+                            "endpoints":{"type":"array","items":{"type":"object"}}
+                        },
+                        "required":["group_id","name","actors","components"]
+                    },
+                    # saranno riempiti sotto
+                    "CPPNInput": {"type":"object","properties":{},"additionalProperties": False},
+                    "CPPNOutput":{
+                        "type":"object",
+                        "properties":{
+                            "status":{"type":"string","enum":["OK","ERROR"]},
+                            "results":{"type":"object","properties":{},"additionalProperties": False},
+                            "trace":{"type":"array","items":{"type":"object"}}
+                        },
+                        "required":["status"]
+                    }
+                }
+            },
+            "security":[{"bearerAuth": []}],
+            "tags":[
+                {"name":"Definition","description":"CPPN definition endpoints"},
+                {"name":"Execution","description":"CPPN execution endpoints"}
+            ]
+        }
+
+        # --- composizione dagli OAS latest di Atomic e CPPS ---
+        in_props, out_props = {}, {}
+        for comp in doc.get("components", []):
+            cid = comp["id"]
+            ctype = comp.get("type")
+            schema_in = schema_out = None
+
+            if ctype == "Atomic":
+                aoas = OpenAPIGenerator._latest_atomic_oas(cid)
+                if aoas:
+                    sch = (aoas.get("components") or {}).get("schemas") or {}
+                    schema_in  = sch.get("AtomicInput")
+                    schema_out = sch.get("AtomicOutput")
+            elif ctype == "CPPS":
+                coas = OpenAPIGenerator._latest_cpps_oas(cid)
+                if coas:
+                    sch = (coas.get("components") or {}).get("schemas") or {}
+                    schema_in  = sch.get("CPPSInput")
+                    schema_out = sch.get("CPPSOutput")
+
+            in_props[cid]  = schema_in  or OpenAPIGenerator._mk_fallback_obj()
+            out_props[cid] = schema_out or OpenAPIGenerator._mk_fallback_obj()
+
+        oas["components"]["schemas"]["CPPNInput"] = {
+            "type":"object", "properties": in_props, "additionalProperties": False
+        }
+        oas["components"]["schemas"]["CPPNOutput"]["properties"]["results"] = {
+            "type":"object", "properties": out_props, "additionalProperties": False
+        }
+
+        return oas

@@ -15,8 +15,13 @@ from .views import (           # <-- arriveranno allo Step 5
     cpps_oas_version,
     cpps_republish,
     cpps_docs_list,
+    cppn_upsert,
+    cppn_republish,
+    cppn_oas_latest,
+    cppn_oas_version,
+    cppn_docs_list
 )
-from .views_ui import SwaggerUIViewCPPS
+from .views_ui import SwaggerUIViewCPPS ,SwaggerUIViewCPPN
 
 from .views_ui import SwaggerUIView
 
@@ -84,4 +89,14 @@ urlpatterns = [
         SwaggerUIViewCPPS.as_view(),
         name="swagger-viewer-cpps-version",
     ),
+
+    path("openapi_docs/api/openapi/cppn", cppn_upsert, name="cppn-upsert"),
+    path("openapi_docs/api/openapi/cppn/<str:group_id>/publish", cppn_republish, name="cppn-republish"),
+    path("openapi_docs/openapi/cppn/<str:group_id>", cppn_oas_latest, name="cppn-oas-latest"),
+    path("openapi_docs/openapi/cppn/<str:group_id>/versions/<str:version>", cppn_oas_version, name="cppn-oas-version"),
+    path("openapi_docs/docs/cppn/", cppn_docs_list, name="cppn-docs"),
+    path("openapi_docs/docs/cppn/<str:group_id>", SwaggerUIViewCPPN.as_view(), name="swagger-viewer-cppn"),
+    path("openapi_docs/docs/cppn/<str:group_id>/versions/<str:version>", SwaggerUIViewCPPN.as_view(), name="swagger-viewer-cppn-version"),
+
+
 ]

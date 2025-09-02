@@ -46,3 +46,18 @@ class SwaggerUIViewCPPS(TemplateView):
             ctx["page_title"] = f"CPPS {group_id} – Swagger"
 
         return ctx
+    
+
+class SwaggerUIViewCPPN(TemplateView):
+    template_name = "openapi_docs/swagger_ui.html"
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        gid = self.kwargs["group_id"]
+        ver = self.kwargs.get("version")
+        if ver:
+            ctx["spec_url"] = reverse("openapi_docs:cppn-oas-version", args=[gid, ver])
+            ctx["page_title"] = f"CPPN {gid} – Swagger (v{ver})"
+        else:
+            ctx["spec_url"] = reverse("openapi_docs:cppn-oas-latest", args=[gid])
+            ctx["page_title"] = f"CPPN {gid} – Swagger"
+        return ctx

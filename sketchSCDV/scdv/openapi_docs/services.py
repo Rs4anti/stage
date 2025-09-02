@@ -4,7 +4,7 @@ import hashlib, json
 from datetime import datetime
 from typing import Optional, Tuple
 # riuso diretto delle collection dal tuo modulo
-from utilities.mongodb_handler import atomic_services_collection, cpps_collection, openapi_collection
+from utilities.mongodb_handler import atomic_services_collection, cpps_collection, cppn_collection, openapi_collection
 
 from openapi_docs.openapi_generator import OpenAPIGenerator
 from openapi_docs.oas_validation import validate_openapi
@@ -245,3 +245,60 @@ def republish_cpps_spec(group_id: str, servers: list | None = None) -> dict:
     Per semplicità, republish = nuova publish con patch bump (come atomic).
     """
     return publish_cpps_spec(group_id, servers=servers)
+
+
+def upsert_cppn(data: dict) -> dict:
+    # upsert by group_id
+    cppn_collection.update_one(
+        {"group_id": data["group_id"]},
+        {"$set": data, "$setOnInsert": {"group_type": "CPPN"}},
+        upsert=True
+    )
+    return cppn_collection.find_one({"group_id": data["group_id"]}, {"_id":0})
+
+def _next_patch(version: str | None) -> str:
+    if not version: return "1.0.0"
+    try:
+        M,m,p = [int(x) for x in version.split(".")]
+        return f"{M}.{m}.{p+1}"
+    except:
+        return "1.0.0"
+
+def _latest_published_version(level: str, ident_key: str, ident_val: str) -> str | None:
+    cur = openapi_collection.find(
+        {"level": level, ident_key: ident_val, "status":"published"},
+        {"_id":0,"version":1}
+    )
+    best, best_t = None, (-1,-1,-1)
+    for d in cur:
+        try:
+            t = tuple(int(x) for x in (d.get("version") or "0.0.0").split("."))
+        except:
+            t = (0,0,0)
+        if t > best_t: best_t, best = t, d.get("version")
+    return best
+
+def publish_cppn_spec(group_id: str, servers: list[dict] | None = None) -> dict:
+    doc = cppn_collection.find_one({"group_id": group_id}, {"_id":0})
+    if not doc:
+        return {"status":"error","errors":["CPPN not found"]}
+
+    latest = _latest_published_version("cppn","group_id",group_id)
+    version = _next_patch(latest)
+
+    oas = OpenAPIGenerator.generate_cppn_openapi(doc, version=version)
+    if servers:
+        oas["servers"] = servers
+
+    ok, errors = validate_openapi(oas)
+    if not ok:
+        return {"status":"error","errors": errors}
+
+    openapi_collection.insert_one({
+        "level":"cppn",
+        "group_id": group_id,
+        "version": version,
+        "status":"published",
+        "oas": oas
+    })
+    return {"status":"ok","version": version}
