@@ -1,9 +1,10 @@
-import os
+import os, traceback
 import uuid
 from tempfile import NamedTemporaryFile
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.shortcuts import render
+from rest_framework import status
 
 from utilities.bpmn_importer import BPMNImporterXmlBased  # Assicurati sia correttamente importata
 
@@ -14,13 +15,12 @@ def importer_home(request):
 @api_view(['POST'])
 def upload_imported_diagram(request):
     name = request.data.get('name')
-    xml = request.data.get('xml_content')
-
+    xml  = request.data.get('xml_content')
     if not name or not xml:
-        return Response({'error': 'Missing data'}, status=400)
+        return Response({'error': 'Missing name or xml_content'}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        with NamedTemporaryFile(mode='w+', suffix=".bpmn", delete=False) as tmp:
+        with NamedTemporaryFile(mode='w+', suffix=".bpmn", delete=False, encoding='utf-8') as tmp:
             tmp.write(xml)
             tmp.flush()
             tmp_path = tmp.name
@@ -30,14 +30,14 @@ def upload_imported_diagram(request):
         result = importer.import_all()
 
         os.remove(tmp_path)
-
-        return Response(result)
+        return Response(result, status=status.HTTP_200_OK)
 
     except Exception as e:
-        return Response({'error': f'Import failed: {str(e)}'}, status=500)
-
-
-from django.shortcuts import render
+        traceback.print_exc()  # stampa in console Django il traceback completo
+        return Response(
+            {'error': f'{type(e).__name__}: {e}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 def import_summary(request):
     return render(request, 'importer/summary.html', {

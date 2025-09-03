@@ -9,7 +9,7 @@ from .mongodb_handler import (
     bpmn_collection,
     cpps_collection
 )
-from openapi_docs.services import publish_atomic_spec
+from openapi_docs.services import publish_atomic_spec, publish_cpps_spec, publish_cppn_spec
 from .helpers import detect_type
 from collections import OrderedDict
 
@@ -92,8 +92,6 @@ class BPMNImporterXmlBased:
                 nested.append(gid)
 
         return nested
-
-    from collections import OrderedDict
 
     def _collapse_cppn_to_groups(self, components, workflow, cpps_map):
         """
@@ -287,7 +285,10 @@ class BPMNImporterXmlBased:
                     }
 
                     MongoDBHandler.save_atomic(atomic_doc)
-                    publish_atomic_spec(service_id=task_id, servers=self.servers)
+                    try:
+                        pub  = publish_atomic_spec(service_id=task_id, servers=self.servers)
+                    except Exception as e:
+                        pub = {"status": "error", "errors": [f"{type(e).__name__}: {e}"]}
                     atomic_count += 1
                     print(f"🔹 Atomic salvato: {task_name}")
                 else:
@@ -340,6 +341,11 @@ class BPMNImporterXmlBased:
                 }
 
                 MongoDBHandler.save_cpps(cpps_doc)
+                try:
+                    pub = publish_cpps_spec(group_id=group_id, servers=self.servers)
+                    print(f"🧩 CPPS published {group_id}: {pub}")
+                except Exception as e:
+                    print(f"❌ CPPS publish failed {group_id}: {type(e).__name__}: {e}")
 
                 atomic_map = {
                     a["task_id"]: a for a in atomic_services_collection.find({
@@ -384,6 +390,13 @@ class BPMNImporterXmlBased:
                     "workflow" : workflow_norm
                 }
                 MongoDBHandler.save_cppn(cppn_doc)
+
+                try:
+                    pubn = publish_cppn_spec(group_id=group_id, servers=self.servers)
+                    print(f"🌐 CPPN published {group_id}: {pubn}")
+                except Exception as e:
+                    print(f"❌ CPPN publish failed {group_id}: {type(e).__name__}: {e}")
+
 
                 atomic_map = {
                     a["task_id"]: a for a in atomic_services_collection.find({

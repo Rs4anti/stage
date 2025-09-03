@@ -54,7 +54,7 @@ def atomic_oas_latest(request, service_id: str):
     """
     Ritorna la OAS JSON latest (versione pubblicata più alta) per l'atomic indicato.
     """
-    latest = _latest_published_version(service_id)
+    latest = _latest_published_version("atomic", "service_id", service_id)
     if not latest:
         return Response({"detail": "No published version"}, status=404)
 

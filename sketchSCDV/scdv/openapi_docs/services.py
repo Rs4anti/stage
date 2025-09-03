@@ -76,45 +76,40 @@ def upsert_atomic(doc: dict) -> dict:
     return atomic_services_collection.find_one({"task_id": doc["task_id"]}, {"_id": 0})
 
 
-def publish_atomic_spec(service_id: str, servers: list | None = None) -> dict:
+def publish_atomic_spec(service_id: str, servers: list[dict] | None = None) -> dict:
     """
-    Genera, valida e pubblica (status=published) la OpenAPI per l'Atomic indicato.
-    - versione = patch + 1 della latest pubblicata; se non esiste, 1.0.0
-    - salva in `openapi` un documento con level=atomic
+    Pubblica la OAS per un Atomic service (version bump patch).
     """
-    atomic = atomic_services_collection.find_one({"task_id": service_id})
-    if not atomic:
-        return {"status": "error", "detail": "Atomic not found"}
+    # 1) recupera il documento atomic
+    doc = atomic_services_collection.find_one({"task_id": service_id}, {"_id": 0})
+    if not doc:
+        return {"status": "error", "errors": [f"Atomic service '{service_id}' not found"]}
 
-    base = _latest_published_version(service_id)  # può essere None
-    version = _bump_patch(base)
+    # 2) calcola la prossima versione (patch) guardando le versioni "published"
+    latest = _latest_published_version("atomic", "service_id", service_id)   # <<< FIX QUI
+    version = _next_patch(latest)
 
-    oas = OpenAPIGenerator.generate_atomic_openapi(atomic, version=version)
+    # 3) genera OAS
+    oas = OpenAPIGenerator.generate_atomic_openapi(doc, version=version)
     if servers:
         oas["servers"] = servers
 
-    ok, errs = validate_openapi(oas)
+    # 4) valida OAS 3.1
+    ok, errors = validate_openapi(oas)
     if not ok:
-        return {"status": "error", "errors": errs}
+        return {"status": "error", "errors": errors}
 
+    # 5) salva su collection openapi
     openapi_collection.insert_one({
         "level": "atomic",
         "service_id": service_id,
-        "diagram_id": atomic.get("diagram_id"),
-        "owner": atomic.get("owner"),
-        "name": atomic.get("name"),
         "version": version,
         "status": "published",
-        "hash": _sha256(oas),
-        "created_at": _now_iso(),
-        "updated_at": _now_iso(),
-        "oas": oas,
-        "meta": {"source": "generator", "tags": []}
+        "oas": oas
     })
 
-    return {"status": "ok", "service_id": service_id, "version": version}
+    return {"status": "ok", "version": version}
 
-# openapi_docs/services.py
 def republish_atomic_spec(service_id: str, servers: list|None=None) -> dict:
     """
     Pubblica una nuova versione della OAS per un atomic già presente.

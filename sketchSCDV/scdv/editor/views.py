@@ -13,9 +13,10 @@ from django.http import JsonResponse
 from bson import ObjectId, json_util
 from bson.errors import InvalidId
 from utilities.helpers import detect_type
-from openapi_docs.services import publish_atomic_spec, upsert_cpps, publish_cpps_spec
-from openapi_docs.serializers import AtomicUpsertSerializer, CPPSUpsertSerializer
+from openapi_docs.services import publish_atomic_spec, publish_cpps_spec, publish_cppn_spec
+from openapi_docs.serializers import AtomicUpsertSerializer
 from django.urls import reverse
+from collections import OrderedDict
 
 def data_view_editor(request):
     return render(request, 'editor/view.html')
@@ -202,8 +203,6 @@ def save_cpps_service(request):
         "openapi_documentation": doc_result
     }, status=status_code)
 
-from collections import OrderedDict
-
 def normalize_components_and_workflow(data, cpps_map):
     """
     Normalizza il CPPS esterno per avere un workflow del tipo:
@@ -381,8 +380,6 @@ def normalize_components_and_workflow(data, cpps_map):
     # ---- Risultato: Activity->Group e Group->Activity, senza leak di nodi interni ----
     return filtered_components, compressed
 
-from collections import OrderedDict
-
 def normalize_cppn_components_and_workflow(
     data,
     cpps_map,
@@ -544,28 +541,24 @@ def save_cppn_service(request):
     result, status_code = MongoDBHandler.save_cppn(data)
 
     if status_code in [200, 201]:
-        # Recupera documento appena salvato
-        saved_doc = cppn_collection.find_one({'group_id': data['group_id']})
+        # servers per self-link corretti
+        servers = [{"url": request.build_absolute_uri("/").rstrip("/")}]
+        pub_res = publish_cppn_spec(group_id=data["group_id"], servers=servers)
 
-        if not saved_doc:
-            print("❌ CPPN not found after save")
-            return Response({"error": "CPPN saved but not found for OpenAPI generation"}, status=500)
-
-        # Recupera i componenti (atomic e cpps)
-        comp_ids_atomic = [c["id"] for c in saved_doc.get("components", []) if c["type"] == "Atomic"]
-        comp_ids_cpps   = [c["id"] for c in saved_doc.get("components", []) if c["type"] == "CPPS"]
-
-        atomic_map = { a["task_id"]: a
-                      for a in atomic_services_collection.find({"task_id": {"$in": comp_ids_atomic}}) }
-        cpps_map   = { c["group_id"]: c
-                      for c in cpps_collection.find({"group_id": {"$in": comp_ids_cpps}}) }
-
-        # Genera documentazione OpenAPI per il CPPN
-        openapi_doc = OpenAPIGenerator.generate_cppn_openapi(saved_doc, atomic_map, cpps_map)
-
-        # Salva documentazione OpenAPI nella collection openapi
-        doc_result, doc_status = MongoDBHandler.save_openapi_documentation(openapi_doc)
-        print("===OpenAPI doc saved:", doc_result)
+        if pub_res.get("status") == "ok":
+            # link utili per la UI (come per i CPPS)
+            json_url = reverse("openapi_docs:cppn-oas-latest", args=[data["group_id"]])
+            swagger_url = reverse("openapi_docs:swagger-viewer-cppn", args=[data["group_id"]])
+            doc_result, doc_status = {
+                **pub_res,
+                "links": {"json": json_url, "swagger": swagger_url}
+            }, 201
+            print("===OpenAPI CPPN published:", pub_res)
+        else:
+            doc_result, doc_status = {
+                "message": "OpenAPI publish failed",
+                "errors": pub_res.get("errors")
+            }, 400
     else:
         doc_result, doc_status = {"message": "CPPN not saved, skipping OpenAPI"}, 400
 
