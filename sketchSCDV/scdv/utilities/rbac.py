@@ -1,17 +1,5 @@
 from .mongodb_handler import rbac_collection
 
-"""
-{'diagram_id': '68b7f887ad90d004364a52ee', 
-'task_id': 'Activity_1u1y293', 
-'name': 'Send Data for Sales Order', 
-'atomic_type': 'dispatch', 
-'input_params': ['100'], 
-'output_params': ['100'], 
-'method': 'POST', 
-'url': '/send_data_order', 
-'owner': 'Customer'}
-"""
-
 class rbac:
     @staticmethod
     def atomic_policy(atomic_data):
@@ -36,7 +24,6 @@ class rbac:
 
         #costruzione policy
         policy = {
-            "task_id" : task_id,
             "service_type" : service_type,
             "atomic_type" : atomic_type,
             "owner" : owner,
@@ -50,7 +37,66 @@ class rbac:
 
         try:
             result = rbac_collection.update_one(
-                {'task_id': task_id},
+                {'activity_id': task_id},
+                {'$set': policy},
+                upsert=True
+            )
+            created = result.upserted_id is not None
+            
+            return {'status': 'ok', 'created policy': created}, 200
+
+        except Exception as e:
+            return {'error': str(e)}, 500
+
+    """{'diagram_id': '68b7f887ad90d004364a52ee', 
+    'group_id': 'Group_1hve9wj',
+    'name': 'quality check cpps', 
+    'description': 'quality check modificato', 
+    'workflow_type': 'sequence',
+    'components': [{'id': 'Activity_1idq175', 'type': 'Atomic'},
+        {'id': 'Activity_1p3burn', 'type': 'Atomic'},
+        {'id': 'Activity_0t9nnj9', 'type': 'Atomic'}, 
+        {'id': 'Activity_07u2eot', 'type': 'Atomic'},
+            {'id': 'Gateway_0ec3hv5', 'type': 'ParallelGateway', 'targets': ['Activity_1p3burn', 'Activity_1idq175']}, 
+            {'id': 'Gateway_0yh6vnf', 'type': 'ParallelGateway', 'targets': ['Activity_0t9nnj9']}], 
+            'workflow': {'Gateway_0ec3hv5': ['Activity_1p3burn', 'Activity_1idq175'], 
+                'Activity_1p3burn': ['Gateway_0yh6vnf'], 'Activity_1idq175': ['Gateway_0yh6vnf'], 
+                'Gateway_0yh6vnf': ['Activity_0t9nnj9'], 'Activity_0t9nnj9': ['Activity_07u2eot']}, 
+            
+            'group_type': 'CPPS', 
+            'owner': 'Production Leader', 
+            'endpoints': []}
+    """ 
+    @staticmethod
+    def cpps_policy(cpps_data, atomic_ids, cpps_ids):
+        service_type = 'cpps'
+        group_id = cpps_data['group_id']
+        components = atomic_ids
+        owner = cpps_data['owner']
+
+        if cpps_ids:
+            components = components + cpps_ids
+        
+        acm: dict[str, str] = {}
+        acm[owner] = {}
+        for comp in components:
+            acm[owner][comp] = "invoke"
+        
+        #costruzione policy
+        policy = {
+            "service_type" : service_type,
+            "owner" : owner,
+            "permissions": 
+            [
+                {"actor": actor , "service" : comp , "permission": perm}
+                for actor, cols in acm.items()
+                for comp,perm in cols.items()
+            ]
+        }
+
+        try:
+            result = rbac_collection.update_one(
+                {"activity_id" : group_id},
                 {'$set': policy},
                 upsert=True
             )

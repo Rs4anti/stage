@@ -101,8 +101,6 @@ def parse_param_list(param_list):
 def save_atomic_service(request):
     data = request.data
 
-    print("Atomic payload received: ", data)
-
     # 1) Genera input/output tipizzati a partire da input_params/output_params
     data = dict(data)  # copiamo per sicurezza
     data['input'] = { str(v): detect_type(v) for v in data.get('input_params', []) }
@@ -200,6 +198,9 @@ def save_cpps_service(request):
                 "message": "OpenAPI publish failed",
                 "errors": pub_res.get("errors")
             }, 400
+        #scrivo policy
+        rbac.cpps_policy(data, component_ids, cpps_ids)
+
     else:
         doc_result, doc_status = {"message": "CPPS not saved, skipping OpenAPI"}, 400
 
