@@ -45,7 +45,7 @@ class BPMNImporterXmlBased:
 
         result = bpmn_collection.insert_one(doc)
         self.diagram_id = result.inserted_id
-        print(f"✅ Diagramma salvato con ID: {self.diagram_id}")
+        print(f"Diagramma salvato con ID: {self.diagram_id}")
 
 
     def _extract_workflow_cpps(self, group_id, members):
@@ -317,7 +317,7 @@ class BPMNImporterXmlBased:
             try:
                 gdpr_map = json.loads(gdpr_tag.text.strip()) if gdpr_tag is not None else {}
             except json.JSONDecodeError:
-                print(f"⚠️ JSON invalido per gdprMap nel gruppo {group_id}")
+                print(f"JSON invalido per gdprMap nel gruppo {group_id}")
                 gdpr_map = {}
 
             if len(involved_actors) == 1:
@@ -343,9 +343,9 @@ class BPMNImporterXmlBased:
                 MongoDBHandler.save_cpps(cpps_doc)
                 try:
                     pub = publish_cpps_spec(group_id=group_id, servers=self.servers)
-                    print(f"🧩 CPPS published {group_id}: {pub}")
+                    print(f"CPPS published {group_id}: {pub}")
                 except Exception as e:
-                    print(f"❌ CPPS publish failed {group_id}: {type(e).__name__}: {e}")
+                    print(f"CPPS publish failed {group_id}: {type(e).__name__}: {e}")
 
                 atomic_map = {
                     a["task_id"]: a for a in atomic_services_collection.find({
@@ -393,9 +393,9 @@ class BPMNImporterXmlBased:
 
                 try:
                     pubn = publish_cppn_spec(group_id=group_id, servers=self.servers)
-                    print(f"🌐 CPPN published {group_id}: {pubn}")
+                    print(f"CPPN published {group_id}: {pubn}")
                 except Exception as e:
-                    print(f"❌ CPPN publish failed {group_id}: {type(e).__name__}: {e}")
+                    print(f"CPPN publish failed {group_id}: {type(e).__name__}: {e}")
 
 
                 atomic_map = {
@@ -409,7 +409,7 @@ class BPMNImporterXmlBased:
                 cppn_count += 1
                 print(f"🧠 CPPN salvato: {group_id}")
 
-        print(f"\n✅ Importazione completata: {atomic_count} atomic, {cpps_count} cpps, {cppn_count} cppn")
+        print(f"\nImportazione completata: {atomic_count} atomic, {cpps_count} cpps, {cppn_count} cppn")
         
         return {
             "diagram_id": str(self.diagram_id),

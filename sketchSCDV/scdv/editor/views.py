@@ -5,6 +5,7 @@ from rest_framework import status
 from django.views.decorators.csrf import csrf_exempt
 from utilities.mongodb_handler import atomic_services_collection, cpps_collection, cppn_collection, bpmn_collection, MongoDBHandler
 from utilities.openapi_generator import OpenAPIGenerator
+from utilities.rbac import rbac
 from django.utils.timezone import now
 from drf_spectacular.utils import extend_schema_view, extend_schema, OpenApiResponse
 from rest_framework.views import APIView
@@ -100,6 +101,8 @@ def parse_param_list(param_list):
 def save_atomic_service(request):
     data = request.data
 
+    print("Atomic payload received: ", data)
+
     # 1) Genera input/output tipizzati a partire da input_params/output_params
     data = dict(data)  # copiamo per sicurezza
     data['input'] = { str(v): detect_type(v) for v in data.get('input_params', []) }
@@ -140,6 +143,8 @@ def save_atomic_service(request):
         # 5) Link utili per la tua UI
         json_url = reverse("openapi_docs:atomic-oas-latest", args=[data["task_id"]])
         swagger_url = reverse("openapi_docs:atomic-docs-latest", args=[data["task_id"]])
+        
+        rbac.atomic_policy(data)
 
         return Response({
             "status": "ok",

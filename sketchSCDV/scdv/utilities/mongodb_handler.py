@@ -13,6 +13,7 @@ cpps_collection = db['cpps']
 cppn_collection = db['cppn']
 bpmn_collection = db['bpmn']
 openapi_collection = db['openapi']
+rbac_collection = db['rbac']
 
 
 class MongoDBHandler:

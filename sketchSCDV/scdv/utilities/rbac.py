@@ -1,49 +1,62 @@
-import json
-from pathlib import Path
+from .mongodb_handler import rbac_collection
 
-class RBAC:
-    def __init__(self, config_path='config/rbac.json'):
-        self.config_path = Path(config_path)
-        self.acm = self.load_acm()
+"""
+{'diagram_id': '68b7f887ad90d004364a52ee', 
+'task_id': 'Activity_1u1y293', 
+'name': 'Send Data for Sales Order', 
+'atomic_type': 'dispatch', 
+'input_params': ['100'], 
+'output_params': ['100'], 
+'method': 'POST', 
+'url': '/send_data_order', 
+'owner': 'Customer'}
+"""
 
-    def load_acm(self):
-        """Load the Access Control Matrix from a JSON file."""
-        if not self.config_path.exists():
-            print(f"RBAC config file {self.config_path} not found. Initializing empty ACM.")
-            return {}
-        with open(self.config_path, 'r') as f:
-            return json.load(f)
+class rbac:
+    @staticmethod
+    def atomic_policy(atomic_data):
 
-    def save_acm(self):
-        """Persist the current ACM back to the JSON file."""
-        self.config_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(self.config_path, 'w') as f:
-            json.dump(self.acm, f, indent=2)
+        service_type = 'atomic'
+        atomic_type = atomic_data['atomic_type']
+        task_id = atomic_data['task_id']
+        components = [task_id]
+        owner = atomic_data['owner']
 
-    def can_invoke(self, actor, service):
-        """Check if an actor can invoke a service."""
-        permissions = self.acm.get(actor, {})
-        return permissions.get(service, 'none') == 'invoke'
+        actors = [owner]
 
-    def add_permission(self, actor, service, permission):
-        """Add or update permission for an actor on a service."""
-        if permission not in ['invoke', 'none']:
-            raise ValueError("Permission must be 'invoke' or 'none'")
-        if actor not in self.acm:
-            self.acm[actor] = {}
-        self.acm[actor][service] = permission
-        self.save_acm()
+        #Access Control Matrix
+        acm: dict[str, str] = {}
+        for actor in actors:
+            acm[actor] = {}
+            for comp in components:
+                acm[actor][comp] = "none"
 
-    def remove_permission(self, actor, service):
-        """Remove permission for an actor on a service."""
-        if actor in self.acm and service in self.acm[actor]:
-            del self.acm[actor][service]
-            self.save_acm()
+        #owner può invocare il proprio atomic
+        acm[owner][task_id] = 'invoke'
 
-    def list_permissions(self, actor):
-        """List all permissions for an actor."""
-        return self.acm.get(actor, {})
+        #costruzione policy
+        policy = {
+            "task_id" : task_id,
+            "service_type" : service_type,
+            "atomic_type" : atomic_type,
+            "owner" : owner,
+            "permissions": 
+            [
+                {"actor": actor , "permission": perm}
+                for actor, cols in acm.items()
+                for comp,perm in cols.items()
+            ]
+        }
 
-    def list_all(self):
-        """List all actors and their permissions."""
-        return self.acm
+        try:
+            result = rbac_collection.update_one(
+                {'task_id': task_id},
+                {'$set': policy},
+                upsert=True
+            )
+            created = result.upserted_id is not None
+            
+            return {'status': 'ok', 'created policy': created}, 200
+
+        except Exception as e:
+            return {'error': str(e)}, 500
