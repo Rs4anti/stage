@@ -1,4 +1,4 @@
-from .mongodb_handler import rbac_collection
+from .mongodb_handler import rbac_collection, atomic_services_collection, cpps_collection
 
 class rbac:
     @staticmethod
@@ -37,7 +37,7 @@ class rbac:
 
         try:
             result = rbac_collection.update_one(
-                {'activity_id': task_id},
+                {'atomic_id': task_id},
                 {'$set': policy},
                 upsert=True
             )
@@ -96,6 +96,97 @@ class rbac:
 
         try:
             result = rbac_collection.update_one(
+                {"cpps_id" : group_id},
+                {'$set': policy},
+                upsert=True
+            )
+            created = result.upserted_id is not None
+            
+            return {'status': 'ok', 'created policy': created}, 200
+
+        except Exception as e:
+            return {'error': str(e)}, 500
+
+    def cppn_policy(cppn_data, components_cppn):
+        service_type = 'cppn'
+        group_id = cppn_data['group_id']
+        
+        actors = set()
+        components = []
+        comp_owner = {}
+
+        for c in components_cppn:
+            if c['type'].lower() == 'atomic':
+                cid = c['id']
+                components.append(cid)
+                owner = rbac.find_atomic_owner(cid)
+
+            elif c['type'].lower() == 'cpps':
+                cid = c['id']
+                components.append(cid)
+                owner = rbac.find_cpps_owner(cid)
+            if owner:
+                actors.add(owner)
+                comp_owner[cid] = owner
+
+        # --- ACM: inizializza tutto a 'none'
+        # acm è una matrice: righe=actors, colonne=components
+        acm = {actor: {cid: "none" for cid in components} for actor in sorted(actors)}
+
+
+        #autorizzo l'owner sul proprio componente
+        for c, owner in comp_owner.items():
+            acm[owner][c] = "invoke"
+
+        policy = {
+            "service_type" : service_type,
+            "actors" : list(actors),
+            "permissions": [
+            {"actor": actor, "service": comp, "permission": perm}
+            for actor, cols in acm.items()
+            for comp, perm in cols.items()
+            ]
+        }
+
+        try:
+            result = rbac_collection.update_one(
+                {"cppn_id" : group_id},
+                {'$set': policy},
+                upsert=True
+            )
+            created = result.upserted_id is not None
+            
+            return {'status': 'ok', 'created policy': created}, 200
+
+        except Exception as e:
+            return {'error': str(e)}, 500
+
+
+
+        
+        """
+        if cpps_ids:
+            components = components + cpps_ids
+        
+        acm: dict[str, str] = {}
+        acm[owner] = {}
+        for comp in components:
+            acm[owner][comp] = "invoke"
+        
+        #costruzione policy
+        policy = {
+            "service_type" : service_type,
+            "owner" : owner,
+            "permissions": 
+            [
+                {"actor": actor , "service" : comp , "permission": perm}
+                for actor, cols in acm.items()
+                for comp,perm in cols.items()
+            ]
+        }
+
+        try:
+            result = rbac_collection.update_one(
                 {"activity_id" : group_id},
                 {'$set': policy},
                 upsert=True
@@ -106,3 +197,15 @@ class rbac:
 
         except Exception as e:
             return {'error': str(e)}, 500
+        """
+
+
+    @staticmethod
+    def find_atomic_owner(task_id):
+        atomic = atomic_services_collection.find_one({'task_id' : task_id })
+        return atomic['owner']
+    
+    @staticmethod
+    def find_cpps_owner(group_id):
+        cpps = cpps_collection.find_one({'group_id' : group_id })
+        return cpps['owner']

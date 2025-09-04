@@ -560,6 +560,8 @@ def save_cppn_service(request):
                 "links": {"json": json_url, "swagger": swagger_url}
             }, 201
             print("===OpenAPI CPPN published:", pub_res)
+
+            rbac.cppn_policy(data, data["components"])
         else:
             doc_result, doc_status = {
                 "message": "OpenAPI publish failed",
