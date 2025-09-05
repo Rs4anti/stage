@@ -67,6 +67,21 @@ class rbac:
             'owner': 'Production Leader', 
             'endpoints': []}
     """ 
+
+    @staticmethod
+    def cpps_policy_from_import(cpps_data_import, components):
+
+        atomic_ids = []
+        cpps_ids = []
+        for c in components:
+            if c['type'].lower() == 'atomic':
+                atomic_ids.append(c['id'])
+            elif c['type'].lower() == 'cpps':
+                cpps_ids.append(c['id'])
+        
+        rbac.cpps_policy(cpps_data_import, atomic_ids, cpps_ids)
+
+
     @staticmethod
     def cpps_policy(cpps_data, atomic_ids, cpps_ids):
         service_type = 'cpps'
@@ -106,8 +121,11 @@ class rbac:
 
         except Exception as e:
             return {'error': str(e)}, 500
-
+    
+    
+    @staticmethod
     def cppn_policy(cppn_data, components_cppn):
+
         service_type = 'cppn'
         group_id = cppn_data['group_id']
         
@@ -125,6 +143,7 @@ class rbac:
                 cid = c['id']
                 components.append(cid)
                 owner = rbac.find_cpps_owner(cid)
+
             if owner:
                 actors.add(owner)
                 comp_owner[cid] = owner

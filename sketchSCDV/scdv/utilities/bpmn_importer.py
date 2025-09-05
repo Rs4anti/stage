@@ -12,6 +12,7 @@ from .mongodb_handler import (
 from openapi_docs.services import publish_atomic_spec, publish_cpps_spec, publish_cppn_spec
 from .helpers import detect_type
 from collections import OrderedDict
+from .rbac import rbac
 
 
 class BPMNImporterXmlBased:
@@ -248,6 +249,7 @@ class BPMNImporterXmlBased:
         cppn_count = 0
         ns = self.namespaces
 
+        # ------------------------ ATOMIC ------------------------
         for elem in self.xml_root.iter():
             tag = self._strip_ns(elem.tag)
 
@@ -285,18 +287,25 @@ class BPMNImporterXmlBased:
                     }
 
                     MongoDBHandler.save_atomic(atomic_doc)
+                    rbac.atomic_policy(atomic_doc)
                     try:
-                        pub  = publish_atomic_spec(service_id=task_id, servers=self.servers)
+                        pub = publish_atomic_spec(service_id=task_id, servers=self.servers)
                     except Exception as e:
                         pub = {"status": "error", "errors": [f"{type(e).__name__}: {e}"]}
+
                     atomic_count += 1
                     print(f"🔹 Atomic salvato: {task_name}")
                 else:
                     print(f"⚠️ Nessuna <atomicExtension> per il task: {task_name}")
 
+        # ------------------------ PARTIZIONA GROUP ------------------------
         group_to_elements = self._extract_group_members()
         actor_map = self._map_task_to_actor()
 
+        cpps_groups = []
+        cppn_groups = []
+
+        # Qui NON salviamo ancora nulla: decidiamo solo il tipo del group
         for group_id, members in group_to_elements.items():
             involved_actors = set(actor_map.get(mid) for mid in members if mid in actor_map)
 
@@ -306,111 +315,133 @@ class BPMNImporterXmlBased:
                 if atomic_services_collection.find_one({"task_id": mid})
             ]
 
+            # Se il group non contiene alcun task atomico "valido", skippa
             if not valid_tasks:
                 continue
+
+            if len(involved_actors) == 1:
+                cpps_groups.append((group_id, members, involved_actors, valid_tasks))
+            else:
+                cppn_groups.append((group_id, members, involved_actors, valid_tasks))
+
+        # ------------------------ PASSO 1: SALVA TUTTI I CPPS ------------------------
+        for group_id, members, involved_actors, valid_tasks in cpps_groups:
+            actor = list(involved_actors)[0] if involved_actors else "UnknownActor"
 
             group_ext = self.xml_root.find(f".//bpmn:group[@id='{group_id}']/bpmn:extensionElements/custom:groupExtension", ns)
             group_name = group_ext.find("custom:name", ns).text.strip() if group_ext is not None and group_ext.find("custom:name", ns) is not None else f"Composite {group_id}"
             group_description = group_ext.find("custom:description", ns).text.strip() if group_ext is not None and group_ext.find("custom:description", ns) is not None else "Imported composite service"
             workflow_type = group_ext.find("custom:workflowType", ns).text.strip() if group_ext is not None and group_ext.find("custom:workflowType", ns) is not None else "sequence"
-            gdpr_tag = group_ext.find("custom:gdprMap", ns)
+            gdpr_tag = group_ext.find("custom:gdprMap", ns) if group_ext is not None else None
             try:
                 gdpr_map = json.loads(gdpr_tag.text.strip()) if gdpr_tag is not None else {}
             except json.JSONDecodeError:
                 print(f"JSON invalido per gdprMap nel gruppo {group_id}")
                 gdpr_map = {}
 
-            if len(involved_actors) == 1:
-                actor = list(involved_actors)[0]
-                workflow = self._extract_workflow_cpps(group_id, members)
-                gateway_components = self._extract_gateways(members)
-                valid_task_ids = [c['id'] for c in valid_tasks]
-                components = valid_tasks + gateway_components
+            workflow = self._extract_workflow_cpps(group_id, members)
+            gateway_components = self._extract_gateways(members)
+            valid_task_ids = [c['id'] for c in valid_tasks]
 
-                cpps_doc = {
-                    "diagram_id": str(self.diagram_id),
-                    "group_id": group_id,
-                    "name": group_name,
-                    "description": group_description,
-                    "workflow_type": workflow_type,
-                    "owner": actor,
-                    "components": components,
-                    "endpoints": [],
-                    "group_type": "CPPS",
-                    "workflow": workflow
-                }
+            components = valid_tasks + gateway_components
 
-                MongoDBHandler.save_cpps(cpps_doc)
-                try:
-                    pub = publish_cpps_spec(group_id=group_id, servers=self.servers)
-                    print(f"CPPS published {group_id}: {pub}")
-                except Exception as e:
-                    print(f"CPPS publish failed {group_id}: {type(e).__name__}: {e}")
+            cpps_doc = {
+                "diagram_id": str(self.diagram_id),
+                "group_id": group_id,
+                "name": group_name,
+                "description": group_description,
+                "workflow_type": workflow_type,
+                "owner": actor,
+                "components": components,
+                "endpoints": [],
+                "group_type": "CPPS",
+                "workflow": workflow,
+                "gdpr_map": gdpr_map
+            }
 
-                atomic_map = {
-                    a["task_id"]: a for a in atomic_services_collection.find({
-                        "task_id": {"$in": valid_task_ids}
-                    })
-                }
+            MongoDBHandler.save_cpps(cpps_doc)
+            rbac.cpps_policy_from_import(cpps_doc, components)
+            try:
+                pub = publish_cpps_spec(group_id=group_id, servers=self.servers)
+                print(f"CPPS published {group_id}: {pub}")
+            except Exception as e:
+                print(f"CPPS publish failed {group_id}: {type(e).__name__}: {e}")
 
-                #openapi_doc = OpenAPIGenerator.generate_cpps_openapi(cpps_doc, atomic_map, {})
-                #MongoDBHandler.save_openapi_documentation(openapi_doc)
-                cpps_count += 1
-                print(f"🧩 CPPS salvato: {group_id}")
+            # (eventuale) mappa atomic se ti serve in seguito
+            # atomic_map = {a["task_id"]: a for a in atomic_services_collection.find({"task_id": {"$in": valid_task_ids}})}
 
-            else:
-                
-                gateway_components = self._extract_gateways(members)
-                # aggiungi i CPPS annidati come componenti del CPPN
-                nested_cpps_ids = self._detect_nested_cpps(group_id)
-                nested_cpps_components = [{"id": gid, "type": "CPPS"} for gid in nested_cpps_ids]
+            cpps_count += 1
+            print(f"🧩 CPPS salvato: {group_id}")
 
-                # componenti COMPLETI del CPPN (Atomic + Gateway + CPPS)
-                components_cppn = valid_tasks + gateway_components + nested_cpps_components
+        # ------------------------ PASSO 2: SALVA TUTTI I CPPN ------------------------
+        cppn_docs_to_rbac = []  # (cppn_doc, components_norm) per RBAC posticipato
 
-                # workflow “grezzo” (sequence interni + message flow, senza eventi)
-                workflow_raw = self._extract_workflow_cppn(group_id, members)  # già ce l’hai :contentReference[oaicite:3]{index=3}
+        for group_id, members, involved_actors, valid_tasks in cppn_groups:
+            group_ext = self.xml_root.find(f".//bpmn:group[@id='{group_id}']/bpmn:extensionElements/custom:groupExtension", ns)
+            group_name = group_ext.find("custom:name", ns).text.strip() if group_ext is not None and group_ext.find("custom:name", ns) is not None else f"Composite {group_id}"
+            group_description = group_ext.find("custom:description", ns).text.strip() if group_ext is not None and group_ext.find("custom:description", ns) is not None else "Imported composite service"
+            workflow_type = group_ext.find("custom:workflowType", ns).text.strip() if group_ext is not None and group_ext.find("custom:workflowType", ns) is not None else "sequence"
+            gdpr_tag = group_ext.find("custom:gdprMap", ns) if group_ext is not None else None
+            try:
+                gdpr_map = json.loads(gdpr_tag.text.strip()) if gdpr_tag is not None else {}
+            except json.JSONDecodeError:
+                print(f"JSON invalido per gdprMap nel gruppo {group_id}")
+                gdpr_map = {}
 
-                # mappa dei CPPS annidati (serve a sapere quali id sono interni a ciascun group)
-                cpps_map = { c["group_id"]: c for c in cpps_collection.find({"group_id": {"$in": nested_cpps_ids}}) }
+            gateway_components = self._extract_gateways(members)
 
-                # COLLASSO
-                components_norm, workflow_norm = self._collapse_cppn_to_groups(components_cppn, workflow_raw, cpps_map)
+            # CPPS annidati dentro al CPPN (ora sono sicuramente salvati)
+            nested_cpps_ids = self._detect_nested_cpps(group_id)
+            nested_cpps_components = [{"id": gid, "type": "CPPS"} for gid in nested_cpps_ids]
 
-                cppn_doc = {
-                    "diagram_id": str(self.diagram_id),
-                    "group_id": group_id,
-                    "name": group_name,
-                    "description": group_description,
-                    "workflow_type": workflow_type,
-                    "actors": list(involved_actors),
-                    "gdpr_map": gdpr_map,
-                    "components": components_norm,
-                    "group_type": "CPPN",
-                    "workflow" : workflow_norm
-                }
-                MongoDBHandler.save_cppn(cppn_doc)
+            # componenti COMPLETI del CPPN
+            components_cppn = valid_tasks + gateway_components + nested_cpps_components
 
-                try:
-                    pubn = publish_cppn_spec(group_id=group_id, servers=self.servers)
-                    print(f"CPPN published {group_id}: {pubn}")
-                except Exception as e:
-                    print(f"CPPN publish failed {group_id}: {type(e).__name__}: {e}")
+            # workflow “grezzo” (sequence interni + message flow, senza eventi)
+            workflow_raw = self._extract_workflow_cppn(group_id, members)
 
+            # mappa dei CPPS annidati presa dal DB (serve per collassare)
+            cpps_map = {c["group_id"]: c for c in cpps_collection.find({"group_id": {"$in": nested_cpps_ids}})}
 
-                atomic_map = {
-                    a["task_id"]: a for a in atomic_services_collection.find({
-                        "task_id": {"$in": [c["id"] for c in valid_tasks]}
-                    })
-                }
-                cpps_map = {}
-                #openapi_doc = OpenAPIGenerator.generate_cppn_openapi(cppn_doc, atomic_map, cpps_map)
-                #MongoDBHandler.save_openapi_documentation(openapi_doc)
-                cppn_count += 1
-                print(f"🧠 CPPN salvato: {group_id}")
+            # collassa interni -> group_id
+            components_norm, workflow_norm = self._collapse_cppn_to_groups(components_cppn, workflow_raw, cpps_map)
+
+            cppn_doc = {
+                "diagram_id": str(self.diagram_id),
+                "group_id": group_id,
+                "name": group_name,
+                "description": group_description,
+                "workflow_type": workflow_type,
+                "actors": list(involved_actors),
+                "gdpr_map": gdpr_map,
+                "components": components_norm,
+                "group_type": "CPPN",
+                "workflow": workflow_norm
+            }
+            MongoDBHandler.save_cppn(cppn_doc)
+
+            try:
+                pubn = publish_cppn_spec(group_id=group_id, servers=self.servers)
+                print(f"CPPN published {group_id}: {pubn}")
+            except Exception as e:
+                print(f"CPPN publish failed {group_id}: {type(e).__name__}: {e}")
+
+            cppn_count += 1
+            print(f"🧠 CPPN salvato: {group_id}")
+
+            # Posticipa RBAC: ora accodiamo e lo eseguiremo alla fine
+            cppn_docs_to_rbac.append((cppn_doc, components_norm))
+
+        # ------------------------ PASSO 3: RBAC sui CPPN ------------------------
+        for cppn_doc, components_norm in cppn_docs_to_rbac:
+            try:
+                rbac.cppn_policy(cppn_doc, components_norm)
+            except Exception as e:
+                # Non blocchiamo l’intero import in caso di errore di policy
+                print(f"[RBAC] cppn_policy fallita per {cppn_doc.get('group_id')}: {type(e).__name__}: {e}")
 
         print(f"\nImportazione completata: {atomic_count} atomic, {cpps_count} cpps, {cppn_count} cppn")
-        
+
         return {
             "diagram_id": str(self.diagram_id),
             "atomic": atomic_count,
