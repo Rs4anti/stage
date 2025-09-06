@@ -2,42 +2,67 @@
 from collections import defaultdict
 from typing import Dict, List, Tuple, Optional, Set
 
+from utilities.mongodb_handler import cppn_collection, cpps_collection, atomic_services_collection
+
+# mappa id Atomic -> name
+_ATOMIC_NAME = {
+    d["task_id"]: d.get("name", d["task_id"])
+    for d in atomic_services_collection.find({}, {"task_id": 1, "name": 1})
+}
+
+# resolver CPPS by id
+def _resolve_cpps_name_from_db(group_id: str) -> str | None:
+    doc = cpps_collection.find_one({"group_id": group_id}, {"name": 1})
+    return doc.get("name") if doc else None
+
+# inietto i resolver nel modulo
+globals()["resolve_cpps_name_by_id"] = _resolve_cpps_name_from_db
+globals()["_ATOMIC_NAME"] = _ATOMIC_NAME
+
+
 # ==================== Helpers su tipi / etichette ====================
 
-def node_type(node_id: str, components: List[dict]) -> str:
+def collect_all_nodes(workflow: Dict[str, list]) -> set:
+    return set(workflow.keys()) | {t for tgts in workflow.values() for t in tgts}
+
+def node_type(node_id: str, components: List[dict], workflow: Dict[str, list] = None) -> str:
     for c in components:
         if c.get("id") == node_id:
             return c.get("type", "Unknown")
+    if workflow and node_id in collect_all_nodes(workflow):
+        return "ExternalAtomic"  # endpoint di message flow fuori dal group
     return "Unknown"
 
 def gateway_label(node_id: str, components: List[dict]) -> str:
-    t = node_type(node_id, components)
-    t_lower = t.lower()
-    if "exclusive" in t_lower:
-        return "ExclusiveGateway"
-    if "inclusive" in t_lower:
-        return "InclusiveGateway"
-    if "parallel" in t_lower:
-        return "ParallelGateway"
-    if "gateway" in t_lower:
-        return "Gateway"
-    return t  # Atomic / CPPS / Unknown
+    t = node_type(node_id, components).lower()
+    if "exclusive" in t: return "ExclusiveGateway"
+    if "inclusive" in t: return "InclusiveGateway"
+    if "parallel"  in t: return "ParallelGateway"
+    if "gateway"   in t: return "Gateway"
+    return t or "Unknown"
+
+def _label_atomic(node_id: str) -> str:
+    # usa nome leggibile se disponibile
+    return _ATOMIC_NAME.get(node_id, node_id)
 
 # opzionale: può essere sostituito runtime dal main (lookup su cpps_collection)
 def resolve_cpps_name_by_id(group_id: str) -> Optional[str]:
     return None
 
-def format_node(node_id: str, components: List[dict]) -> str:
-    t = node_type(node_id, components).lower()
+# 3) aggiorna format_node per gestire ExternalAtomic
+def format_node(node_id: str, components: List[dict], workflow: Dict[str, list]) -> str:
+    t = node_type(node_id, components, workflow).lower()
     if t == "atomic":
-        return node_id
+        return _label_atomic(node_id)
+    if t == "externalatomic":
+        return f"External({_label_atomic(node_id)})"
     if "gateway" in t:
         return gateway_label(node_id, components)
     if t == "cpps":
         name = resolve_cpps_name_by_id(node_id)
         return f"CPPS({name or node_id})"
-    return f"{t.upper()}({node_id})"
-
+    # fallback
+    return node_id
 # ==================== Logica grafo ====================
 
 def build_degrees(workflow: Dict[str, List[str]]) -> Tuple[Dict[str, int], Dict[str, int]]:
@@ -66,46 +91,51 @@ def render_branch_until_join(start: str,
                              in_deg: Dict[str, int],
                              out_deg: Dict[str, int],
                              seen: Set[str]) -> Tuple[str, Optional[str]]:
-    expr_parts = []
+    parts = []
     current = start
     local_seen = set()
     first = True
 
+    def _outs_sorted(u: str) -> List[str]:
+        outs = workflow.get(u, [])
+        # prima gli endpoint esterni del message flow, poi il resto
+        return sorted(
+            outs,
+            key=lambda n: 0 if node_type(n, components, workflow).lower() == "externalatomic" else 1
+        )
+
     while True:
         if current in local_seen or current in seen:
-            expr_parts.append(f"[loop:{current}]")
-            return " -> ".join(expr_parts), None
+            parts.append(f"[loop:{format_node(current, components, workflow)}]")
+            return " -> ".join(parts), None
         local_seen.add(current)
 
-        outs = next_of(current, workflow)
-        expr_parts.append(format_node(current, components))
+        # stampa il nodo corrente
+        parts.append(format_node(current, components, workflow))
 
-        # split interno al branch
+        # split dentro la branch (solo dopo il primo nodo)
         if out_deg.get(current, 0) > 1 and not first:
-            expr_parts[-1] = gateway_label(current, components)
-            split_str = render_split(current, workflow, components, in_deg, out_deg, seen | local_seen)
-            expr_parts.append(split_str)
-            return " -> ".join(expr_parts), None
+            # rimpiazzo il nodo con lo split completo
+            parts[-1] = render_split(current, workflow, components, in_deg, out_deg, seen | local_seen)
+            return " -> ".join(parts), None
 
+        outs = _outs_sorted(current)
         if not outs:
-            return " -> ".join(expr_parts), None
+            return " -> ".join(parts), None
 
         nxt = outs[0]
-        if in_deg.get(nxt, 0) > 1:
-            return " -> ".join(expr_parts), nxt
 
-        expr_parts.append("->")
+        # se il prossimo è un join (in>1), fermati e restituisci il join
+        if in_deg.get(nxt, 0) > 1:
+            return " -> ".join(parts), nxt
+
+        # altrimenti continua in avanti
         current = nxt
         first = False
 
+
 def find_nearest_common_convergence(starts: List[str],
                                     workflow: Dict[str, List[str]]) -> Optional[str]:
-    """
-    Dato un elenco di nodi di partenza (le uscite di uno split),
-    trova il primo nodo raggiungibile da *tutti* (con distanza minima complessiva).
-    Ritorna None se non esiste un nodo comune.
-    """
-    # BFS da ciascun start per calcolare distanze minime
     dist_maps = []
     for s in starts:
         dist = {s: 0}
@@ -119,27 +149,51 @@ def find_nearest_common_convergence(starts: List[str],
                     q.append(v)
         dist_maps.append(dist)
 
-    # intersezione dei nodi raggiungibili
     common = set(dist_maps[0].keys())
     for d in dist_maps[1:]:
         common &= set(d.keys())
-
     if not common:
         return None
 
-    # scegli il nodo "più vicino" in media (o con max distanza minimale)
     best = None
     best_score = None
     for n in common:
-        # evitiamo di restituire lo stesso start se presente in tutti (non è vera convergenza)
         if n in starts and len(starts) > 1:
             continue
         dists = [d[n] for d in dist_maps]
-        score = (max(dists), sum(dists))  # ordina per max, poi per somma
+        score = (max(dists), sum(dists))
         if best is None or score < best_score:
-            best = n
-            best_score = score
+            best, best_score = n, score
     return best
+
+def render_split(node: str,
+                 workflow: Dict[str, List[str]],
+                 components: List[dict],
+                 in_deg: Dict[str, int],
+                 out_deg: Dict[str, int],
+                 seen: Set[str]) -> str:
+    outs = workflow.get(node, [])
+    branches, joins = [], []
+
+    for t in outs:
+        b_str, j = render_branch_until_join(t, workflow, components, in_deg, out_deg, seen)
+        branches.append(b_str)
+        joins.append(j)
+
+    label = gateway_label(node, components)
+    base = f"{label}(" + ", ".join(branches) + ")"
+
+    join_set = {j for j in joins if j is not None}
+    if len(join_set) == 1:
+        cont = render_linear_from(join_set.pop(), workflow, components, in_deg, out_deg, seen | set(outs))
+        return base + " -> " + cont
+
+    conv = find_nearest_common_convergence(outs, workflow)
+    if conv:
+        cont = render_linear_from(conv, workflow, components, in_deg, out_deg, seen | set(outs))
+        return base + " -> " + cont
+
+    return base
 
 def render_split(node: str,
                  workflow: Dict[str, List[str]],
@@ -187,27 +241,26 @@ def render_linear_from(node: str,
 
     while True:
         if current in local_seen or current in global_seen:
-            parts.append(f"[loop:{current}]")
+            parts.append(f"[loop:{format_node(current, components, workflow)}]")
             break
         local_seen.add(current)
 
         if first_print:
-            parts.append(format_node(current, components))
+            parts.append(format_node(current, components, workflow))
             first_print = False
 
-        outs = next_of(current, workflow)
+        outs = workflow.get(current, [])
         deg_out = out_deg.get(current, 0)
 
         if deg_out == 0:
             break
 
         if deg_out > 1:
-            branch_expr = render_split(current, workflow, components, in_deg, out_deg, global_seen | local_seen)
-            parts[-1] = branch_expr  # evita "Gateway Gateway(...)"
+            parts[-1] = render_split(current, workflow, components, in_deg, out_deg, global_seen | local_seen)
             break
 
         nxt = outs[0]
-        parts.append(" -> " + format_node(nxt, components))
+        parts.append(" -> " + format_node(nxt, components, workflow))
         current = nxt
 
     return "".join(parts)

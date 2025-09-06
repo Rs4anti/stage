@@ -614,44 +614,137 @@ def get_all_services(request):
     })
 
 
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+
 @api_view(['DELETE'])
 def delete_group(request, group_id):
-    deleted = False
+    try:
+        # Prova a cancellare dalla collezione CPPS
+        deleted_cpps = cpps_collection.find_one_and_delete({'group_id': group_id})
+        # Prova a cancellare anche dalla collezione CPPN (nel caso tu voglia permettere delete per gruppi CPPN)
+        deleted_cppn = cppn_collection.find_one_and_delete({'group_id': group_id})
 
-    # Prova a cancellare dalla collezione CPPS
-    if cpps_collection.find_one({'group_id': group_id}):
-        cpps_collection.find_one_and_delete({'group_id': group_id})
-        deleted = True
+        deleted_any = bool(deleted_cpps or deleted_cppn)
 
-    # Prova a cancellare dalla collezione CPPN
-    elif cppn_collection.find_one({'group_id': group_id}):
-        cppn_collection.find_one_and_delete({'group_id': group_id})
-        deleted = True
+        # --- Pulizia riferimenti in altri documenti ---
 
-    # Rimuove il group_id da nested_cpps in altri CPPS
-    removed_from_cpps = cpps_collection.update_many(
-        { 'nested_cpps': group_id },
-        { '$pull': { 'nested_cpps': group_id } }
-    )
+        # 1) rimozione da components e workflow
+        pipeline = [
+            { "$set": {
+                # components: rimuovi item con id == group_id (facoltativo filtrare anche per type == "CPPS")
+                "components": {
+                    "$filter": {
+                        "input": "$components",
+                        "as": "c",
+                        "cond": { "$ne": ["$$c.id", group_id] }
+                        # Se vuoi essere più stretto:
+                        # "cond": { "$not": { "$and": [ { "$eq": ["$$c.id", group_id] }, { "$eq": ["$$c.type", "CPPS"] } ] } }
+                    }
+                }
+            }},
+            { "$set": {
+                # workflow: elimina la chiave uguale a group_id
+                "workflow": {
+                    "$cond": [
+                        { "$and": [
+                            { "$ne": ["$workflow", None] },
+                            { "$eq": [ { "$type": "$workflow" }, "object" ] }
+                        ]},
+                        {
+                            "$arrayToObject": {
+                                "$map": {
+                                    "input": {
+                                        "$filter": {
+                                            "input": { "$objectToArray": "$workflow" },
+                                            "as": "w",
+                                            "cond": { "$ne": ["$$w.k", group_id] }
+                                        }
+                                    },
+                                    "as": "w",
+                                    "in": {
+                                        "k": "$$w.k",
+                                        # rimuove group_id da ogni lista di destinazioni
+                                        "v": {
+                                            "$cond": [
+                                                { "$isArray": "$$w.v" },
+                                                {
+                                                    "$filter": {
+                                                        "input": "$$w.v",
+                                                        "as": "t",
+                                                        "cond": { "$ne": ["$$t", group_id] }
+                                                    }
+                                                },
+                                                "$$w.v"
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "$workflow"
+                    ]
+                }
+            }},
+            # 2) rimuovi group_id da nested_cpps (se esiste e se è un array)
+            { "$set": {
+                "nested_cpps": {
+                    "$cond": [
+                        { "$isArray": "$nested_cpps" },
+                        {
+                            "$filter": {
+                                "input": "$nested_cpps",
+                                "as": "n",
+                                "cond": { "$ne": ["$$n", group_id] }
+                            }
+                        },
+                        "$nested_cpps"
+                    ]
+                }
+            }}
+        ]
 
-    # Rimuove il group_id da nested_cpps in CPPN
-    removed_from_cppn = cppn_collection.update_many(
-        { 'nested_cpps': group_id },
-        { '$pull': { 'nested_cpps': group_id } }
-    )
+        # Applica solo a documenti che potenzialmente contengono riferimenti
+        match = {
+            "$or": [
+                {"components.id": group_id},
+                {f"workflow.{group_id}": {"$exists": True}},
+                {"workflow": {"$elemMatch": {"$in": [group_id]}}},  # non funziona con object, ma lasciamo gli altri due controlli
+                {"nested_cpps": group_id}
+            ]
+        }
 
-    if deleted:
+        cpps_update = cpps_collection.update_many(match, pipeline)
+        cppn_update = cppn_collection.update_many(match, pipeline)
+
+        # 3) Fallback: un pull semplice su nested_cpps per sicurezza (idempotente)
+        pull_nested = {"$pull": {"nested_cpps": group_id}}
+        cpps_pull = cpps_collection.update_many({"nested_cpps": group_id}, pull_nested)
+        cppn_pull = cppn_collection.update_many({"nested_cpps": group_id}, pull_nested)
+
+        if deleted_any:
+            return Response({
+                "message": f"Gruppo {group_id} deleted!",
+                "deleted_from_cpps": bool(deleted_cpps),
+                "deleted_from_cppn": bool(deleted_cppn),
+                "updated_cpps_docs": cpps_update.modified_count,
+                "updated_cppn_docs": cppn_update.modified_count,
+                "pulled_cpps_nested": cpps_pull.modified_count,
+                "pulled_cppn_nested": cppn_pull.modified_count
+            }, status=status.HTTP_200_OK)
+
+        # Anche se non esisteva, comunichiamo cosa abbiamo ripulito
         return Response({
-            'message': f'Gruppo {group_id} delted!',
-            'removed_from_nested_cpps': removed_from_cpps.modified_count,
-            'removed_from_nested_cppn': removed_from_cppn.modified_count
-        }, status=status.HTTP_200_OK)
+            "error": f"Gruppo {group_id} not found",
+            "updated_cpps_docs": cpps_update.modified_count,
+            "updated_cppn_docs": cppn_update.modified_count,
+            "pulled_cpps_nested": cpps_pull.modified_count,
+            "pulled_cppn_nested": cppn_pull.modified_count
+        }, status=status.HTTP_404_NOT_FOUND)
 
-    return Response({
-        'error': f'Gruppo {group_id} not found',
-        'removed_from_nested_cpps': removed_from_cpps.modified_count,
-        'removed_from_nested_cppn': removed_from_cppn.modified_count
-    }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 
@@ -675,34 +768,68 @@ def add_nested_cpps(request, group_id):
 @api_view(['DELETE'])
 def delete_atomic(request, atomic_id):
     try:
-
-        # Elimino atomic
+        # 1) Elimino l'atomic dalla sua collection
         deleted = atomic_services_collection.find_one_and_delete({'task_id': atomic_id})
         if not deleted:
             return Response({'error': 'Atomic service not found'}, status=404)
 
-        # Rimuovo atomic dai CPPS
-        cpps_result = cpps_collection.update_many(
-            {'atomic_services': atomic_id},
-            {'$pull': {'atomic_services': atomic_id}}
-        )
+        # Pipeline che:
+        # - filtra components rimuovendo gli item con id == atomic_id
+        # - rimuove la chiave di workflow == atomic_id
+        # - rimuove atomic_id da TUTTE le liste di workflow
+        pipeline = [
+            { "$set": {
+                "components": {
+                    "$filter": {
+                        "input": "$components",
+                        "as": "c",
+                        "cond": { "$ne": ["$$c.id", atomic_id] }
+                    }
+                }
+            }},
+            { "$set": {
+                "workflow": {
+                    "$arrayToObject": {
+                        "$map": {
+                            "input": {
+                                # toglie eventuale entry con chiave == atomic_id
+                                "$filter": {
+                                    "input": { "$objectToArray": "$workflow" },
+                                    "as": "w",
+                                    "cond": { "$ne": ["$$w.k", atomic_id] }
+                                }
+                            },
+                            "as": "w",
+                            "in": {
+                                "k": "$$w.k",
+                                # rimuove atomic_id da ogni lista destinazioni
+                                "v": {
+                                    "$filter": {
+                                        "input": "$$w.v",
+                                        "as": "t",
+                                        "cond": { "$ne": ["$$t", atomic_id] }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }}
+        ]
 
-        # Rimuovo atomic dai CPPN
-        cppn_result = cppn_collection.update_many(
-            {'atomic_services': atomic_id},
-            {'$pull': {'atomic_services': atomic_id}}
-        )
+        # Applichiamo la pipeline a TUTTI i doc (è idempotente/cheap lato server)
+        cpps_result = cpps_collection.update_many({}, pipeline)
+        cppn_result = cppn_collection.update_many({}, pipeline)
 
         return Response({
-            'status': 'deleted',
-            'removed_from_cpps': cpps_result.modified_count,
-            'removed_from_cppn': cppn_result.modified_count
-        }, status=200)
-
-    except Exception as e:
-        print(f"❌ Errore durante l'eliminazione dell'atomic: {e}")
-        return Response({'error': str(e)}, status=500)
+            "status": "deleted",
+            "removed_from_cpps": cpps_result.modified_count,
+            "removed_from_cppn": cppn_result.modified_count
+        }, status=200)  
     
+    except Exception as e:
+        print(f"Errore durante l'eliminazione dell'atomic: {e}")
+        return Response({"error": str(e)}, status=500)
 
 @api_view(['DELETE'])
 def delete_diagram_and_services(request, diagram_id):

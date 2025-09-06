@@ -1,4 +1,3 @@
-# openapi_docs/views.py
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -11,20 +10,19 @@ from openapi_docs.services import (
     upsert_atomic,
     publish_atomic_spec,
     republish_atomic_spec,
-    _latest_published_version,   # riuso per la latest
+    _latest_published_version,
     upsert_cpps,
     publish_cpps_spec,
     upsert_cppn,
     publish_cppn_spec
 )
 
-# openapi_docs/views.py (aggiungi in cima al file)
 from django.shortcuts import render
 from django.urls import reverse
 import re
 
 def openapi_docs_home(request):
-    return render(request, "openapi_docs/openapi_docs.html")  # il tuo template homepage
+    return render(request, "openapi_docs/openapi_docs.html")
 
 
 @api_view(["POST"])
@@ -38,7 +36,7 @@ def atomic_upsert(request):
 
     atomic_doc = upsert_atomic(ser.validated_data)
 
-    # opzionale: aggiungiamo servers alla OAS con la base URL calcolata dalla request
+    # opzionale: aggiunta servers alla OAS con la base URL calcolata dalla request
     servers = [{"url": request.build_absolute_uri("/").rstrip("/")}]
 
     pub = publish_atomic_spec(service_id=atomic_doc["task_id"], servers=servers)

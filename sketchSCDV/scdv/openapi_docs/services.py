@@ -86,7 +86,7 @@ def publish_atomic_spec(service_id: str, servers: list[dict] | None = None) -> d
         return {"status": "error", "errors": [f"Atomic service '{service_id}' not found"]}
 
     # 2) calcola la prossima versione (patch) guardando le versioni "published"
-    latest = _latest_published_version("atomic", "service_id", service_id)   # <<< FIX QUI
+    latest = _latest_published_version("atomic", "service_id", service_id)
     version = _next_patch(latest)
 
     # 3) genera OAS

@@ -1,7 +1,5 @@
 from django.db import models
 
-# TODO: ELIMINARE-> FATTO IN MONGO
-
 class BPMNDiagram(models.Model):
     name = models.CharField(max_length=255)
     xml_content = models.TextField()  # BPMN XML

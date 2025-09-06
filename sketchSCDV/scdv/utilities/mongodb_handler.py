@@ -86,15 +86,15 @@ class MongoDBHandler:
         if mode == 'nested':
             doc = {'task_id': task_id, 'data': records}
             atomic_df.replace_one({'task_id': task_id}, doc, upsert=True)
-            print(f"✅ Saved combined DataFrame as nested document for task_id: {task_id}")
+            print(f"Saved combined DataFrame as nested document for task_id: {task_id}")
 
         elif mode == 'separate':
             atomic_df.delete_many({'task_id': task_id})  # clean old data
             atomic_df.insert_many(records)
-            print(f"✅ Saved combined DataFrame as separate documents for task_id: {task_id}")
+            print(f"Saved combined DataFrame as separate documents for task_id: {task_id}")
 
         else:
-            raise ValueError("❌ Unknown mode: choose from 'nested' or 'separate'")
+            raise ValueError("Unknown mode: choose from 'nested' or 'separate'")
 
 
     @staticmethod
