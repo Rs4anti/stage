@@ -357,6 +357,7 @@ class OpenAPIGenerator:
         meta_value = {
             "group_id": gid,
             "name": doc.get("name"),
+            "business_goal": doc.get("business_goal", ""),
             "description": doc.get("description"),
             "diagram_id": doc.get("diagram_id"),
             "group_type": "CPPN",
@@ -409,6 +410,7 @@ class OpenAPIGenerator:
                 "x-gdpr_map": doc.get("gdpr_map", {}),
                 "x-workflow-type": doc.get("workflow_type"),
                 "x-components": doc.get("components", []),
+                "x-business_goal": doc.get("business_goal", "")
             },
             "paths": {
                 f"/cppn/{gid}": {"get": get_op},
@@ -434,6 +436,7 @@ class OpenAPIGenerator:
                         "properties":{
                             "group_id":{"type":"string","const": gid},
                             "name":{"type":"string"},
+                            "business_goal": {"type":"string"},
                             "description":{"type":"string"},
                             "diagram_id":{"type":"string"},
                             "group_type":{"type":"string","const":"CPPN"},

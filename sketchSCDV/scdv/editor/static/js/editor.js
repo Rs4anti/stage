@@ -331,14 +331,21 @@ function renderCPPNDetails(section, data) {
   title.textContent = 'CPPN Service';
   section.appendChild(title);
 
-  const fields = ['name', 'description', 'workflow_type'];
-  fields.forEach(k => {
-    if (data[k]) {
-      const p = document.createElement('p');
-      p.innerHTML = `<strong>${k}:</strong> ${data[k]}`;
-      section.appendChild(p);
-    }
-  });
+  const fields = ['name', 'business_goal' ,'description', 'workflow_type'];
+  const labels = {
+  name: "Name",
+  business_goal: "Business Goal",
+  description: "Description",
+  workflow_type: "Workflow Type"
+};
+
+fields.forEach(k => {
+  if (data[k]) {
+    const p = document.createElement('p');
+    p.innerHTML = `<strong>${labels[k]}:</strong> ${data[k]}`;
+    section.appendChild(p);
+  }
+});
 
   // Actors
   if (Array.isArray(data.actors)) {

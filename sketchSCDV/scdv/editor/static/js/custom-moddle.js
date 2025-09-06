@@ -27,9 +27,10 @@ const customModdle = {
         { name: 'description', type: 'String' },
         { name: 'workflowType', type: 'String' },
         { name: 'members', type: 'String' },
-        { name: 'actor', type: 'String' },        // 👈 AGGIUNTO
+        { name: 'actor', type: 'String' },  
         { name: 'actors', type: 'String' },
-        { name: 'gdprMap', type: 'String' }
+        { name: 'gdprMap', type: 'String' },
+        { name: 'businessGoal', type: 'String' }
       ]
     }
   ]

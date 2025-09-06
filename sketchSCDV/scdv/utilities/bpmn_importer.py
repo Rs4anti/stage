@@ -381,6 +381,9 @@ class BPMNImporterXmlBased:
             group_name = group_ext.find("custom:name", ns).text.strip() if group_ext is not None and group_ext.find("custom:name", ns) is not None else f"Composite {group_id}"
             group_description = group_ext.find("custom:description", ns).text.strip() if group_ext is not None and group_ext.find("custom:description", ns) is not None else "Imported composite service"
             workflow_type = group_ext.find("custom:workflowType", ns).text.strip() if group_ext is not None and group_ext.find("custom:workflowType", ns) is not None else "sequence"
+            business_goal_tag = group_ext.find("custom:businessGoal", ns) if group_ext is not None else None
+            business_goal = business_goal_tag.text.strip() if business_goal_tag is not None else ""
+
             gdpr_tag = group_ext.find("custom:gdprMap", ns) if group_ext is not None else None
             try:
                 gdpr_map = json.loads(gdpr_tag.text.strip()) if gdpr_tag is not None else {}
@@ -416,7 +419,8 @@ class BPMNImporterXmlBased:
                 "gdpr_map": gdpr_map,
                 "components": components_norm,
                 "group_type": "CPPN",
-                "workflow": workflow_norm
+                "workflow": workflow_norm,
+                "business_goal" : business_goal
             }
             MongoDBHandler.save_cppn(cppn_doc)
 
