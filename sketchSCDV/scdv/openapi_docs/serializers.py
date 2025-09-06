@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+GDPR_ROLES = ["Data Controller", "Data Processor", "Data Subject", "Supervisory Authority"]
+
 class AtomicUpsertSerializer(serializers.Serializer):
     diagram_id = serializers.CharField()
     task_id = serializers.CharField()       # = service_id
