@@ -98,7 +98,7 @@ async function saveDiagram() {
             if (!newName) return; // utente ha annullato
             body.name = newName;
             window.diagramHasFinalName = true;
-            console.log(`✅ Renaming diagram ${diagramId} to '${newName}'`);
+            console.log(`Renaming diagram ${diagramId} to '${newName}'`);
         }
 
         const response = await fetch(url, {
@@ -112,15 +112,15 @@ async function saveDiagram() {
 
         const data = await response.json();
         if (response.ok) {
-            alert("✅ Diagram saved successfully!");
+            alert("Diagram saved successfully!");
             window.diagramId = data.id;
             localStorage.setItem('diagramId', data.id);
         } else {
-            alert("⚠️ Error saving:\n" + JSON.stringify(data));
+            alert("Error saving:\n" + JSON.stringify(data));
         }
     } catch (err) {
-        console.error("❌ Error saving diagram", err);
-        alert("❌ Error saving diagram.");
+        console.error("Error saving diagram", err);
+        alert("Error saving diagram.");
     }
 }
 
@@ -131,7 +131,7 @@ const editButton = document.getElementById('edit-details-button');
 bpmnModeler.get('eventBus').on('element.click', function (e) {
   const el = e.element;
 
-  console.log("Elemento selezionato " + el.type);  
+  console.log("Selected element " + el.type);  
 
   if (el && (el.type === 'bpmn:Task' || el.type === 'bpmn:Group')) {
     selectedElement = el;
@@ -159,7 +159,7 @@ document.getElementById('edit-details-button').addEventListener('click', functio
     selectedElement.businessObject.loadedData || null
   );
   } else {
-    alert('Elemento non editabile!');
+    alert('Not editable doc!');
   }
 });
 

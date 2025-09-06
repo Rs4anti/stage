@@ -315,8 +315,13 @@ class BPMNImporterXmlBased:
                 if atomic_services_collection.find_one({"task_id": mid})
             ]
 
-            # Se il group non contiene alcun task atomico "valido", skippa
-            if not valid_tasks:
+            #controllo se cpps ha dentro altri cpps o gateway
+            has_nested = bool(self._detect_nested_cpps(group_id))
+            has_gateways = bool(self._extract_gateways(members))
+
+           # skippa solo se davvero vuoto
+            if not (valid_tasks or has_nested or has_gateways):
+                print(f"[IMPORT] Skip {group_id}: no atomic/cpps/gateways")
                 continue
 
             if len(involved_actors) == 1:
