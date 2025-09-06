@@ -5,7 +5,7 @@ def detect_type(value):
     if isinstance(value, int):
         return 'integer'
     if isinstance(value, float):
-        return 'number'
+        return 'float'
     if isinstance(value, str):
         val = value.strip()
         if val.lower() in ['true', 'false']:
@@ -17,7 +17,7 @@ def detect_type(value):
             pass
         try:
             float(val)
-            return 'number'
+            return 'float'
         except ValueError:
             pass
         return 'string'

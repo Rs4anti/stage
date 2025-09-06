@@ -419,8 +419,9 @@ function renderNotFound(id) {
 export async function loadAvailableServices() {
   try {
     const res = await fetch('/editor/api/all-services/');
+    
     const data = await res.json();
-
+    console.log(data);
     const atomicList = document.getElementById('atomicServiceList');
     const cppsList = document.getElementById('cppsServiceList');
     const cppnList = document.getElementById('cppnServiceList');

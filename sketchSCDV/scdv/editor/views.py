@@ -603,15 +603,65 @@ def get_atomic_service(request, task_id):
 
 @api_view(['GET'])
 def get_all_services(request):
-    atomic = list(atomic_services_collection.find({}, {'_id': 0, 'name': 1}))
-    cpps = list(cpps_collection.find({}, {'_id': 0, 'name': 1}))
-    cppn = list(cppn_collection.find({}, {'_id': 0, 'name': 1}))
+    atomic = list(atomic_services_collection.find(
+        {},
+        {
+            '_id': 0,
+            'task_id': 1,
+            'name': 1,
+            'description': 1,
+            # normalizza i nomi lato API se nel DB hai input_params/output_params
+            'input': 1,
+            'output': 1,
+            'input_params': 1,
+            'output_params': 1,
+            'owner' : 1,
+            'atomic_type' : 1,
+            'url' : 1,
+            'method' : 1
+        }
+    ))
+
+    # normalizzazione server-side: se input/output mancano, prendi input_params/output_params
+    for a in atomic:
+        a['input']  = a.get('input')  or a.get('input_params')  or {}
+        a['output'] = a.get('output') or a.get('output_params') or {}
+        a.pop('input_params', None)
+        a.pop('output_params', None)
+
+    cpps = list(cpps_collection.find(
+        {},
+        {
+            '_id': 0,
+            'group_id': 1,
+            'name': 1,
+            'description': 1,
+            'components': 1,
+            'owner': 1
+        }
+    ))
+
+    cppn = list(cppn_collection.find(
+        {},
+        {
+            '_id': 0,
+            'group_id': 1,
+            'name': 1,
+            'description': 1,
+            'components': 1,
+            'actors': 1,
+            'gdpr_map': 1,
+            'business_goal': 1
+        }
+    ))
 
     return Response({
         'atomic': atomic,
         'cpps': cpps,
         'cppn': cppn
     })
+
+
 
 
 from rest_framework.decorators import api_view
