@@ -45,10 +45,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       localStorage.setItem('diagramId', data.id);
       window.diagramHasFinalName = true;
       
-      console.log("Modalità modifica attivata per:", data.name);
+      console.log("Edit mode activated for:", data.name);
     } catch (err) {
-      console.error("Errore nel caricamento del diagramma:", err);
-      alert("❌ Impossible loading diagram to edit it.");
+      console.error("Error loading diagram:", err);
+      alert("Impossible loading diagram to edit it.");
     }
   } else {
     console.log("New diagram (no id in URL)");

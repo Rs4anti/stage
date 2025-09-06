@@ -31,10 +31,10 @@ function CustomContextPadProvider(config, contextPad, modeling, translate) {
           headers: { 'X-CSRFToken': getCookie('csrftoken') }
         }).then(response => {
           if (!response.ok) {
-            console.error(`Errore eliminazione ${itemTypeToDelete} ${itemToDelete.id}`);
+            console.error(`Error deleting ${itemTypeToDelete} ${itemToDelete.id}`);
           }
         }).catch(error => {
-          console.error('Errore di rete:', error);
+          console.error('Network error:', error);
         });
 
         bootstrap.Modal.getInstance(modalEl).hide();
@@ -60,7 +60,7 @@ function CustomContextPadProvider(config, contextPad, modeling, translate) {
           const modalEl = document.getElementById('deleteItemModal');
 
           if (!typeEl || !idEl || !nameEl || !descEl || !modalEl) {
-            console.warn('Modale non trovata nel DOM');
+            console.warn('Modal not found in DOM');
             return;
           }
 
@@ -79,13 +79,13 @@ function CustomContextPadProvider(config, contextPad, modeling, translate) {
                 return response.json();
               })
               .then(data => {
-                nameEl.innerText = data.name || '(senza nome)';
-                descEl.innerText = data.atomic_type || '(nessuna descrizione)';
+                nameEl.innerText = data.name || '(no name)';
+                descEl.innerText = data.atomic_type || '(no description)';
                 new bootstrap.Modal(modalEl).show();
               })
               .catch(error => {
-                console.error('Errore recupero dettagli atomic:', error);
-                nameEl.innerText = '(errore recupero)';
+                console.error('Error loading atomic details:', error);
+                nameEl.innerText = '(fetching error)';
                 descEl.innerText = error.message;
                 new bootstrap.Modal(modalEl).show();
               });
@@ -102,11 +102,11 @@ function CustomContextPadProvider(config, contextPad, modeling, translate) {
                   return response.json();
                 } else {
                   // Fallback su CPPN
-                  console.warn(`CPPS non trovato per ${element.id}, provo CPPN...`);
+                  console.warn(`CPPS not found for ${element.id}, trying CPPN...`);
                   return fetch(`/editor/api/cppn_service/${element.id}/`)
                     .then(res => {
                       if (!res.ok) {
-                        throw new Error(`CPPN non trovato (${res.status})`);
+                        throw new Error(`CPPN not found (${res.status})`);
                       }
                       return res.json();
                     });
@@ -118,8 +118,8 @@ function CustomContextPadProvider(config, contextPad, modeling, translate) {
                 new bootstrap.Modal(modalEl).show();
               })
               .catch(error => {
-                console.error('Errore recupero dettagli gruppo:', error);
-                nameEl.innerText = '(errore recupero)';
+                console.error('Error fetching group\'s details:', error);
+                nameEl.innerText = '(fetching error)';
                 descEl.innerText = error.message;
                 new bootstrap.Modal(modalEl).show();
               });

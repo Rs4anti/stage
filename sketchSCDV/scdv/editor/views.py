@@ -828,7 +828,7 @@ def delete_atomic(request, atomic_id):
         }, status=200)  
     
     except Exception as e:
-        print(f"Errore durante l'eliminazione dell'atomic: {e}")
+        print(f"Error during atomic delete: {e}")
         return Response({"error": str(e)}, status=500)
 
 @api_view(['DELETE'])

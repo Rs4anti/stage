@@ -312,6 +312,6 @@ if __name__ == "__main__":
             print(f"\n[{group_id}] {name}\n  {graph_str}\n")
             count += 1
         except Exception as e:
-            print(f"[{doc.get('group_id','?')}] ERRORE nel rendering: {type(e).__name__}: {e}")
+            print(f"[{doc.get('group_id','?')}] Rendering error: {type(e).__name__}: {e}")
 
     print(f"\nTotale CPPN processati: {count}")

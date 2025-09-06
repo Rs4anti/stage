@@ -45,7 +45,7 @@
   // Verifica se esiste già (case-insensitive)
   const check = await fetch(`/editor/api/check-name/?name=${encodeURIComponent(name)}`);
   if (!check.ok) {
-    alert("❌ Errore durante la verifica del nome.");
+    alert("Checking name error");
     return;
   }
 
