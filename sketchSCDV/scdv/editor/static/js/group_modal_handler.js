@@ -12,6 +12,7 @@ function openGroupClassificationForm(element, existingData = null) {
   let actors = '';
   let gdprMap = {};
   let endpoints = [];
+  let businessGoal = '';
   console.log('GDPR MAP detected:', gdprMap);
 
 
@@ -25,6 +26,8 @@ function openGroupClassificationForm(element, existingData = null) {
     actors = (existingData.actors || []).join(', ');
     gdprMap = existingData.gdpr_map || {};
     endpoints = existingData.endpoints || [];
+    businessGoal = existingData.business_goal || '';
+
   }
 
   // estensioni già salvate nel diagramma
@@ -37,6 +40,7 @@ function openGroupClassificationForm(element, existingData = null) {
       workflowType = ext.workflowType || '';
       singleActor = ext.actor || '';
       actors = ext.actors || '';
+      businessGoal = ext.businessGoal || '';
       try {
         gdprMap = typeof ext.gdprMap === 'string' ? JSON.parse(ext.gdprMap) : ext.gdprMap || {};
       } catch {
@@ -80,6 +84,8 @@ function openGroupClassificationForm(element, existingData = null) {
 
   document.getElementById('singleActor').readOnly = true;
   document.getElementById('actorsInvolved').readOnly = true;
+  document.getElementById('businessGoal').value = businessGoal || '';
+
 
   //GDPR Map
   const gdprContainer = document.getElementById('gdprMapContainer');
@@ -178,16 +184,19 @@ function toggleCPPNFields() {
   const cppnFields = document.getElementById('cppnFields');
   const cppsActorField = document.getElementById('cppsActorField');
   const cppsEndpoints = document.getElementById('cppsEndpoints'); // aggiunto
+  const businessGoalField = document.getElementById('cppnBusinessGoalField');
 
   if (cppnFields && cppsActorField && cppsEndpoints) {
     if (type === 'CPPN') {
       cppnFields.style.display = 'block';
       cppsActorField.style.display = 'none';
       cppsEndpoints.style.display = 'none'; // nasconde se non CPPS
+      if (businessGoalField) businessGoalField.style.display = 'block';
     } else {
       cppnFields.style.display = 'none';
       cppsActorField.style.display = 'block';
       cppsEndpoints.style.display = 'block'; // mostra se CPPS
+      if (businessGoalField) businessGoalField.style.display = 'none';
     }
   }
 }

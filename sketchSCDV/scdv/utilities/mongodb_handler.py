@@ -107,7 +107,8 @@ class MongoDBHandler:
             'workflow_type',
             'components',
             'actors',
-            'gdpr_map'
+            'gdpr_map',
+            'business_goal'
         ]
 
         missing = [f for f in required_fields if f not in data]
@@ -139,6 +140,7 @@ class MongoDBHandler:
                 'workflow_type': data['workflow_type'],
                 'actors': data['actors'],
                 'gdpr_map': data['gdpr_map'],
+                'business_goal' : data['business_goal']
             }
 
             # Unisco atomic_services + nested_cpps in components

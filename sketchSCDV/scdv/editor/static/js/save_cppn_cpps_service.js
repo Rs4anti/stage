@@ -16,6 +16,10 @@ function addGroupExtension(groupElement, values) {
   if (values.groupType === 'CPPN' && Array.isArray(values.actors)) {
     extensionProps.actors = values.actors.join(',');
   }
+  
+  if (values.groupType === 'CPPN' && values.businessGoal) {
+    extensionProps.businessGoal = values.businessGoal;
+  }
 
   if (values.groupType === 'CPPS' && typeof values.actor === 'string') {
     extensionProps.actor = values.actor;
@@ -46,6 +50,7 @@ async function saveCompositeService() {
   const workflowType = document.getElementById('workflowTypeSelect').value;
   const actor = document.getElementById('singleActor')?.value.trim() || '';
   const actors = document.getElementById('actorsInvolved')?.value.trim() || '';
+  const businessGoal = document.getElementById('businessGoal')?.value.trim() || '';
 
   const gdprMap = {};
   const gdprMapContainer = document.getElementById('gdprMapContainer');
@@ -67,14 +72,14 @@ async function saveCompositeService() {
   });
 
   const { components, workflow } = detectGroupMembers(currentElement);
-  console.log("🧩 Detected components:", components);
+  console.log(" Detected components:", components);
 
   if (!name) {
     alert("Composite service's name is mandatory!");
     return;
   }
 
-  // ⏳ Salvo il diagramma (se non già fatto)
+  // Salvo il diagramma (se non già fatto)
   const diagramId = await ensureDiagramSaved();
   if (!diagramId) {
     alert("Diagram not saved.");
@@ -82,8 +87,8 @@ async function saveCompositeService() {
   }
   window.diagramId = diagramId;
 
-  // 🧩 Aggiungi extension custom al BPMN
-  console.log("📌 Before extension:", currentElement.businessObject.extensionElements);
+  // Aggiungi extension custom al BPMN
+  console.log(" Before extension:", currentElement.businessObject.extensionElements);
   addGroupExtension(currentElement, {
     groupType,
     name,
@@ -92,7 +97,8 @@ async function saveCompositeService() {
     components,
     actors: groupType === 'CPPN' ? actors.split(',').map(a => a.trim()) : [],
     actor: groupType === 'CPPS' ? actor : '',
-    gdprMap
+    gdprMap,
+    businessGoal
   });
   console.log("✅ After extension:", currentElement.businessObject.extensionElements);
 
@@ -117,6 +123,7 @@ async function saveCompositeService() {
       payload.group_type = 'CPPN';
       payload.actors = actors.split(',').map(s => s.trim());
       payload.gdpr_map = gdprMap;
+      payload.business_goal = businessGoal;
       
       console.log('WF nodes:', Object.keys(workflow));
       console.log('Payload CPPN:', payload);
@@ -135,7 +142,7 @@ async function saveCompositeService() {
       payload.endpoints = endpoints;
       payload.workflow = workflow;
 
-      console.log("🔀 Workflow detected:", workflow);
+      console.log("Workflow detected:", workflow);
 
       result = await fetch('/editor/api/save-cpps-service/', {
         method: 'POST',
