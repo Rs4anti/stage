@@ -28,6 +28,4 @@ urlpatterns = [
     path('viewer/', include('viewer.urls')),
     path('importer/', include('importer.urls')),
     path("", include(("openapi_docs.urls", "openapi_docs"), namespace="openapi_docs")),
-
-
 ]

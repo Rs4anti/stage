@@ -86,7 +86,7 @@ class BPMNImporterXmlBased:
             if not (gx <= x <= gx+gw and gy <= y <= gy+gh):
                 continue
 
-            # è davvero un CPPS? guarda l’estensione custom
+            # è davvero un CPPS? check l’estensione custom
             ext = self.xml_root.find(f".//bpmn:group[@id='{gid}']/bpmn:extensionElements/custom:groupExtension", ns)
             gtype = ext.find("custom:groupType", ns).text.strip() if ext is not None and ext.find("custom:groupType", ns) is not None else ""
             if gtype == "CPPS":
@@ -111,7 +111,7 @@ class BPMNImporterXmlBased:
 
         nested_internal = set(node_to_group.keys())  # atomic + gateway interni
 
-        # 3a) filtra i componenti del CPPN: niente leak di nodi interni
+        # filtra i componenti del CPPN: niente leak di nodi interni
         filtered_components = []
         for c in components:
             cid, ctype = c["id"], c["type"]
@@ -119,7 +119,7 @@ class BPMNImporterXmlBased:
                 continue
             filtered_components.append(c)
 
-        # 3b) mappa gli archi
+        # mappa gli archi
         collapsed = OrderedDict()
         def add(s, t):
             if s == t: return
@@ -185,14 +185,14 @@ class BPMNImporterXmlBased:
             if t not in wf[s]:
                 wf[s].append(t)
 
-        # ---- A) SequenceFlow interni al group (no Event) ----------------------
+        # ---- SequenceFlow interni al group (no Event) ----------------------
         for seq in self.xml_root.findall(".//bpmn:sequenceFlow", ns):
             s = seq.attrib.get("sourceRef")
             t = seq.attrib.get("targetRef")
             if s in allowed and t in allowed:
                 add(s, t)
 
-        # ---- B) MessageFlow: almeno un endpoint interno; escludi Event --------
+        # ---- MessageFlow: almeno un endpoint interno; escludi Event --------
         for mf in self.xml_root.findall(".//bpmn:messageFlow", ns):
             s = mf.attrib.get("sourceRef")
             t = mf.attrib.get("targetRef")
@@ -294,9 +294,9 @@ class BPMNImporterXmlBased:
                         pub = {"status": "error", "errors": [f"{type(e).__name__}: {e}"]}
 
                     atomic_count += 1
-                    print(f"🔹 Atomic salvato: {task_name}")
+                    print(f"Atomic salvato: {task_name}")
                 else:
-                    print(f"⚠️ Nessuna <atomicExtension> per il task: {task_name}")
+                    print(f"Nessuna <atomicExtension> per il task: {task_name}")
 
         # ------------------------ PARTIZIONA GROUP ------------------------
         group_to_elements = self._extract_group_members()
@@ -305,7 +305,7 @@ class BPMNImporterXmlBased:
         cpps_groups = []
         cppn_groups = []
 
-        # Qui NON salviamo ancora nulla: decidiamo solo il tipo del group
+        # Qui NON salvo nulla: decido solo il tipo del group
         for group_id, members in group_to_elements.items():
             involved_actors = set(actor_map.get(mid) for mid in members if mid in actor_map)
 
@@ -372,11 +372,11 @@ class BPMNImporterXmlBased:
             except Exception as e:
                 print(f"CPPS publish failed {group_id}: {type(e).__name__}: {e}")
 
-            # (eventuale) mappa atomic se ti serve in seguito
+            # (eventuale) mappa atomic se serve in seguito
             # atomic_map = {a["task_id"]: a for a in atomic_services_collection.find({"task_id": {"$in": valid_task_ids}})}
 
             cpps_count += 1
-            print(f"🧩 CPPS salvato: {group_id}")
+            print(f"CPPS salvato: {group_id}")
 
         # ------------------------ PASSO 2: SALVA TUTTI I CPPN ------------------------
         cppn_docs_to_rbac = []  # (cppn_doc, components_norm) per RBAC posticipato
@@ -398,7 +398,7 @@ class BPMNImporterXmlBased:
 
             gateway_components = self._extract_gateways(members)
 
-            # CPPS annidati dentro al CPPN (ora sono sicuramente salvati)
+            # CPPS annidati dentro al CPPN
             nested_cpps_ids = self._detect_nested_cpps(group_id)
             nested_cpps_components = [{"id": gid, "type": "CPPS"} for gid in nested_cpps_ids]
 
@@ -446,7 +446,7 @@ class BPMNImporterXmlBased:
             try:
                 rbac.cppn_policy(cppn_doc, components_norm)
             except Exception as e:
-                # Non blocchiamo l’intero import in caso di errore di policy
+                # Non blocca l’intero import in caso di errore di policy
                 print(f"[RBAC] cppn_policy fallita per {cppn_doc.get('group_id')}: {type(e).__name__}: {e}")
 
         print(f"\nImportazione completata: {atomic_count} atomic, {cpps_count} cpps, {cppn_count} cppn")

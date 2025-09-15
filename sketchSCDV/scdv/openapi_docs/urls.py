@@ -1,15 +1,14 @@
-# openapi_docs/urls.py
 from django.urls import path
 from .views import (
-    openapi_docs_home,          # NEW
-    atomic_docs_list,           # NEW
+    openapi_docs_home,       
+    atomic_docs_list,        
     atomic_upsert,
     atomic_oas_latest,
     atomic_oas_version,
     atomic_republish,
 )
 
-from .views import (           # <-- arriveranno allo Step 5
+from .views import ( 
     cpps_upsert,
     cpps_oas_latest,
     cpps_oas_version,

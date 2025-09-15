@@ -23,6 +23,6 @@
 
   viewer.importXML(`{{ diagram_xml|safe }}`)
     .then(() => viewer.get('canvas').zoom('fit-viewport'))
-    .catch(err => console.error('Errore caricamento BPMN:', err));
+    .catch(err => console.error('Error loading BPMN:', err));
 </script>
 {% endblock %}

@@ -214,7 +214,7 @@ class OpenAPIGenerator:
                     "bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}
                 },
                 "schemas": {
-                     # --- NEW ---
+
             "CPPSComponent": {
                 "type": "object",
                 "properties": {
@@ -262,7 +262,6 @@ class OpenAPIGenerator:
                 },
                 "required": ["group_id", "name", "components"]
             },
-            # --- restano come prima; verranno arricchiti sotto ---
                     "CPPSInput": {
                         "type": "object",
                         "properties": {
@@ -285,13 +284,13 @@ class OpenAPIGenerator:
             "security": [{"bearerAuth": []}]
         }
 
-        # --------- ARRICCHIMENTO: comporre schemi dagli Atomic ----------
+        # ---------composizione dagli Atomic ----------
         inputs: Dict[str, Any] = {}
         outputs: Dict[str, Any] = {}
 
         for comp in doc.get("components", []):
             if comp.get("type") != "Atomic":
-                # (eventuale estensione: se CPPS nested, potresti comporre ricorsivamente)
+                # (eventuale estensione: se CPPS nested, per comporre ricorsivamente)
                 continue
             sid = comp["id"]
             atomic_oas = OpenAPIGenerator._latest_atomic_oas(sid)

@@ -1,8 +1,8 @@
 # openapi_docs/oas_validation.py
 def validate_openapi(oas: dict) -> tuple[bool, list[str]]:
     """
-    Se hai il pacchetto openapi-spec-validator lo usiamo,
-    altrimenti facciamo controlli minimi.
+    Se presente il pacchetto openapi-spec-validator viene usato,
+    altrimenti controlli minimi.
     """
     errors = []
     try:

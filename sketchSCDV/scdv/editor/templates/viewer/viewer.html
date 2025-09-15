@@ -66,27 +66,27 @@ async function exportDiagram(id) {
     a.click();
     URL.revokeObjectURL(url);
   } catch (err) {
-    alert("❌ Impossible exporting diagram.");
+    alert("Impossible exporting diagram.");
     console.error(err);
   }
 }
 
 
 async function deleteFullDiagram(id) {
-  if (!confirm(`⚠️ Vuoi eliminare il diagramma e tutti i servizi collegati (${id})?`)) return;
+  if (!confirm(`Do you want to delete the diagram and all related services (${id})?`)) return;
 
   try {
     const res = await fetch(`/editor/api/delete-diagram/${id}/`, { method: 'DELETE' });
     const data = await res.json();
 
     if (res.ok) {
-      alert("✅ Eliminazione completata");
+      alert("DIAGRAM DELETED!");
       location.reload();
     } else {
-      alert("❌ Errore: " + (data.error || "Eliminazione fallita"));
+      alert("Error: " + (data.error || "Delete failed"));
     }
   } catch (e) {
-    alert("❌ Errore di rete: " + e.message);
+    alert("Network error: " + e.message);
   }
 }
 

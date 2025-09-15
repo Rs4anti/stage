@@ -2,9 +2,11 @@ from pymongo import MongoClient
 from bson import ObjectId
 from .mongodb_dataframe_builder import AtomicServiceDataFrameBuilder
 
+#connesione a mongodb
 client = MongoClient("mongodb://localhost:27017/")
 db = client["scdv_db"]
 
+#definizione collections
 atomic_services_collection = db['atomic_services']
 atomic_df = db['atomic_df']
 atomic_df_overview = db['atomic_df_overview']
@@ -77,7 +79,7 @@ class MongoDBHandler:
         - 'separate': salva in una collection separata per riga
         """
         if df.empty:
-            print("⚠️ DataFrame is empty, skipping persistence.")
+            print("DataFrame is empty, skipping persistence.")
             return
 
         task_id = df['task_id'].iloc[0]

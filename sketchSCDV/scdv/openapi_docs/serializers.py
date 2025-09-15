@@ -39,7 +39,7 @@ class CPPSEndpointSerializer(serializers.Serializer):
 class CPPSUpsertSerializer(serializers.Serializer):
     """
     Serializer per l'upsert di documenti CPPS su Mongo e per la
-    generazione della specifica OpenAPI 3.1 coerente con il paper.
+    generazione della specifica OpenAPI 3.1 coerente con il paper bagozi.
     """
     group_id = serializers.CharField()
     diagram_id = serializers.CharField()
@@ -51,7 +51,7 @@ class CPPSUpsertSerializer(serializers.Serializer):
 
     components = serializers.ListField(child=CPPSComponentSerializer(), allow_empty=False)
 
-    # Esempio dal tuo documento:
+    # Esempio dal documento:
     # "workflow": { "Activity_07o8s0a": ["Activity_16oz7n2"] }
     workflow = serializers.DictField(
         child=serializers.ListField(child=serializers.CharField()),
@@ -74,14 +74,14 @@ class CPPSUpsertSerializer(serializers.Serializer):
         - group_type deve essere 'CPPS'
         - niente self-loop evidenti in workflow (opzionale, ma utile)
         """
-        # 1) component ids
+        #component ids
         comp_ids = [c["id"] for c in data.get("components", [])]
         if any(not cid.strip() for cid in comp_ids):
             raise serializers.ValidationError("Tutti i component.id devono essere non vuoti.")
         if len(set(comp_ids)) != len(comp_ids):
             raise serializers.ValidationError("I component.id devono essere univoci nel CPPS.")
 
-        # 2) workflow references
+        #workflow references
         wf = data.get("workflow", {})
         unknown = set()
 
@@ -99,7 +99,7 @@ class CPPSUpsertSerializer(serializers.Serializer):
                 f"Workflow fa riferimento a id non presenti in components: {sorted(list(unknown))}"
             )
 
-        # 3) tipo
+        # tipo
         if data.get("group_type") != "CPPS":
             raise serializers.ValidationError("group_type deve essere 'CPPS'.")
 

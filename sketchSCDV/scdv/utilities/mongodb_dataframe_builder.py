@@ -36,14 +36,11 @@ class AtomicServiceDataFrameBuilder:
 
         df = pd.DataFrame(rows)
 
-        # Separate input and output
         input_rows = df[df['io_type'] == 'input'][['param_name', 'param_type']].reset_index(drop=True)
         output_rows = df[df['io_type'] == 'output'][['param_name', 'param_type']].reset_index(drop=True)
 
-        # Overview data (single row)
         overview = df[['task_id', 'diagram_id', 'name', 'atomic_type', 'method', 'url', 'owner']].iloc[0].to_dict()
 
-        # Build wide format row
         wide_row = {**overview}
         for idx, row in input_rows.iterrows():
             wide_row[f'input_{idx+1}'] = row['param_name']
@@ -52,7 +49,7 @@ class AtomicServiceDataFrameBuilder:
             wide_row[f'output_{idx+1}'] = row['param_name']
             wide_row[f'output_{idx+1}_type'] = row['param_type']
 
-        # Create final DataFrame
+        # Creazione final DataFrame
         wide_df = pd.DataFrame([wide_row])
 
         return wide_df

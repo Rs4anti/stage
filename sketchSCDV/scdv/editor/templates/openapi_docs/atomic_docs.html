@@ -32,16 +32,16 @@
           <td><span class="badge bg-secondary">{{ service.method }}</span></td>
           <td><code>{{ service.url }}</code></td>
           <td>
-            <a href="{{ service.json_url }}" target="_blank" class="btn btn-sm btn-outline-secondary me-1">JSON</a>
+            <a href="{{ service.json_url }}" target="_blank" class="btn btn-sm btn-outline-secondary me-1">JSON DRF</a>
             <a href="{{ service.swagger_url }}" target="_blank" class="btn btn-sm btn-primary me-1">Swagger UI</a>
 
-            <!-- Opzionale: bottone Rigenera spec -->
+            <!-- Opzionale: bottone Rigenera spec 
             <form action="{{ service.republish_url }}" method="post" style="display:inline;">
               {% csrf_token %}
               <button type="submit" class="btn btn-sm btn-warning" onclick="return confirm('Rigenerare la spec di {{ service.task_id }}?');">
                 Rigenera
               </button>
-            </form>
+            </form>-->
           </td>
         </tr>
       {% empty %}

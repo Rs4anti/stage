@@ -26,7 +26,7 @@ def openapi_docs_home(request):
 
 
 @api_view(["POST"])
-#@permission_classes([IsAuthenticated])   # rimuovi se vuoi testare senza auth
+#@permission_classes([IsAuthenticated])   # testare senza auth
 def atomic_upsert(request):
     """
     Upsert dell'atomic + pubblicazione automatica della sua OpenAPI.
@@ -47,7 +47,7 @@ def atomic_upsert(request):
 
 
 @api_view(["GET"])
-#@permission_classes([IsAuthenticated])   # rimuovi se vuoi testare senza auth
+#@permission_classes([IsAuthenticated])   # testare senza auth
 def atomic_oas_latest(request, service_id: str):
     """
     Ritorna la OAS JSON latest (versione pubblicata più alta) per l'atomic indicato.
@@ -70,7 +70,7 @@ def atomic_oas_latest(request, service_id: str):
 
 
 @api_view(["GET"])
-#@permission_classes([IsAuthenticated])   # rimuovi se vuoi testare senza auth
+#@permission_classes([IsAuthenticated])   # testare senza auth
 def atomic_oas_version(request, service_id: str, version: str):
     """
     Ritorna la OAS JSON per versione specifica.
@@ -182,7 +182,7 @@ def cpps_oas_version(request, group_id: str, version: str):
 @api_view(["POST"])
 def cpps_republish(request, group_id: str):
     """
-    Ripubblica la OAS CPPS (patch-bump di versione). Utile se aggiorni il doc CPPS.
+    Ripubblica la OAS CPPS (patch-bump di versione). Utile se aggiorno il doc CPPS.
     """
     servers = [{"url": request.build_absolute_uri("/").rstrip("/")}]
     res = publish_cpps_spec(group_id=group_id, servers=servers)
@@ -191,7 +191,7 @@ def cpps_republish(request, group_id: str):
 
 def cpps_docs_list(request):
     """
-    Pagina elenco CPPS per il tuo template editor/templates/openapi_docs/cpps_docs.html.
+    Pagina elenco CPPS per il template editor/templates/openapi_docs/cpps_docs.html.
     """
     cur = cpps_collection.find({}, {"_id": 0, "group_id": 1, "name": 1, "owner": 1})
     services = []

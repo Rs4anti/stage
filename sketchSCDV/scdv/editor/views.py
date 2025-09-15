@@ -2,13 +2,9 @@ from django.shortcuts import render
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
-from django.views.decorators.csrf import csrf_exempt
 from utilities.mongodb_handler import atomic_services_collection, cpps_collection, cppn_collection, bpmn_collection, MongoDBHandler
-from utilities.openapi_generator import OpenAPIGenerator
 from utilities.rbac import rbac
 from django.utils.timezone import now
-from drf_spectacular.utils import extend_schema_view, extend_schema, OpenApiResponse
-from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.http import JsonResponse
 from bson import ObjectId, json_util
@@ -18,6 +14,7 @@ from openapi_docs.services import publish_atomic_spec, publish_cpps_spec, publis
 from openapi_docs.serializers import AtomicUpsertSerializer
 from django.urls import reverse
 from collections import OrderedDict
+from utilities.mongodb_handler import openapi_collection
 
 def data_view_editor(request):
     return render(request, 'editor/view.html')
@@ -101,12 +98,12 @@ def parse_param_list(param_list):
 def save_atomic_service(request):
     data = request.data
 
-    # 1) Genera input/output tipizzati a partire da input_params/output_params
+    # Genera input/output tipizzati a partire da input_params/output_params
     data = dict(data)  # copiamo per sicurezza
     data['input'] = { str(v): detect_type(v) for v in data.get('input_params', []) }
     data['output'] = { str(v): detect_type(v) for v in data.get('output_params', []) }
 
-    # 2) Validazione schema (DRF) per evitare payload incompleti
+    # Validazione schema (DRF) per evitare payload incompleti
     ser = AtomicUpsertSerializer(data={
         "diagram_id": data.get("diagram_id"),
         "task_id": data.get("task_id"),
@@ -120,7 +117,7 @@ def save_atomic_service(request):
     })
     ser.is_valid(raise_exception=True)
 
-    # 3) Salvataggio atomic nel DB (usa i campi 'input'/'output' già tipizzati)
+    # Salvataggio atomic nel DB
     result, status_code = MongoDBHandler.save_atomic({
         "diagram_id": data["diagram_id"],
         "task_id": data["task_id"],
@@ -133,12 +130,11 @@ def save_atomic_service(request):
         "output": data["output"],
     })
 
-    # 4) Se ok, pubblica la OpenAPI (version bump automatico)
+    # Se ok, pubblica la OpenAPI
     if status_code in (200, 201):
         servers = [{"url": request.build_absolute_uri("/").rstrip("/")}]
         pub_res = publish_atomic_spec(service_id=data["task_id"], servers=servers)
 
-        # 5) Link utili per la tua UI
         json_url = reverse("openapi_docs:atomic-oas-latest", args=[data["task_id"]])
         swagger_url = reverse("openapi_docs:atomic-docs-latest", args=[data["task_id"]])
         
@@ -151,7 +147,6 @@ def save_atomic_service(request):
             "links": {"json": json_url, "swagger": swagger_url}
         }, status=status.HTTP_201_CREATED if status_code == 201 else status.HTTP_200_OK)
 
-    # 6) Errore: non pubblichiamo la spec
     return Response({
         "status": "error",
         "detail": "Atomic not saved, OpenAPI skipped",
@@ -163,12 +158,12 @@ def save_cpps_service(request):
     data = request.data
     print("===CPPS Payload received:", data)
 
-    # Estrai componenti
+    # Estraggo componenti
     components = data.get('components', [])
     component_ids = [c['id'] for c in components if c['type'] == 'Atomic']
     cpps_ids = [c['id'] for c in components if c['type'] == 'CPPS']
 
-    # Recupera documenti atomic e cpps annidati
+    # Recupero documenti atomic e cpps annidati
     atomic_map = {
         a["task_id"]: a
         for a in atomic_services_collection.find({"task_id": {"$in": component_ids}})
@@ -247,19 +242,19 @@ def normalize_components_and_workflow(data, cpps_map):
     nested_atomic_ids = set(atomic_to_group.keys())
     nested_internal_ids = set(node_to_group.keys())  # atomic + gateway interni
 
-    # ---- Filtra i componenti del CPPS esterno: rimuovi nodi interni (atomic/gateway) ----
+    # ---- Filtro componenti del CPPS esterno: rimuovi nodi interni (atomic/gateway) ----
     filtered_components = []
     for c in components:
         cid, ctype = c["id"], c["type"]
-        # escludi tutto ciò che è interno a un CPPS annidato (tranne il CPPS stesso)
+        # escludo tutto ciò che è interno a un CPPS annidato (tranne il CPPS stesso)
         if cid in nested_internal_ids and ctype != "CPPS":
             continue
-        # escludi atomic duplicati interni
+        # escludo atomic duplicati interni
         if ctype == "Atomic" and cid in nested_atomic_ids:
             continue
         filtered_components.append(c)
 
-    # ---- Costruisci workflow esterno con soli Activity->Group e Group->Activity ----
+    # ---- Costruisco workflow esterno con soli Activity->Group e Group->Activity ----
     mapped = OrderedDict()
 
     def add_edge(src, tgt, store=mapped):
@@ -323,7 +318,7 @@ def normalize_components_and_workflow(data, cpps_map):
         for t in tgts:
             add_c(src, t)
 
-    # Rimuovi i gateway compressi dai target
+    # Rimuove i gateway compressi dai target
     if compressed_gateways:
         for s, tgts in list(compressed.items()):
             new_tgts = [t for t in tgts if t not in compressed_gateways]
@@ -373,7 +368,7 @@ def normalize_components_and_workflow(data, cpps_map):
                 if t not in compressed[g]:
                     compressed[g].append(t)
 
-        # cancella le sorgenti 'a' appiattite
+        # cancella le sorgenti appiattite
         for a in to_delete_sources:
             compressed.pop(a, None)
 
@@ -431,7 +426,7 @@ def normalize_cppn_components_and_workflow(
 
     nested_internal_ids = set(node_to_group.keys())  # atomic + gateway interni
 
-    # ---- Filtra i componenti del CPPN: rimuovi *solo* i nodi interni ai CPPS ----
+    # ---- Filtra i componenti del CPPN: rimuove solo i nodi interni ai CPPS ----
     filtered_components = []
     for c in components:
         cid, ctype = c["id"], c["type"]
@@ -439,7 +434,7 @@ def normalize_cppn_components_and_workflow(
             continue  # non far trapelare i nodi interni ai CPPS
         filtered_components.append(c)
 
-    # ---- Costruisci il workflow tenendo i gateway ESTERNI ----
+    # ---- Costruisco il workflow tenendo i gateway ESTERNI ----
     mapped = OrderedDict()
 
     def add_edge(store, s, t):
@@ -464,7 +459,7 @@ def normalize_cppn_components_and_workflow(
                     continue  # evita self-loop group->group sullo stesso CPPS
                 add_edge(mapped, gid, t_mapped)
         else:
-            # Sorgente esterna (Activity, Gateway, Group esterno): mantienila
+            # Sorgente esterna (Activity, Gateway, Group esterno): mantenura
             dedup = []
             for t in targets:
                 # target interno? collassa al relativo group
@@ -474,7 +469,7 @@ def normalize_cppn_components_and_workflow(
             for t in dedup:
                 add_edge(mapped, source, t)
 
-    # ---- (opzionale) comprimi solo gateway ESTERNI banali ----
+    # ---- (opzionale) comprimo solo gateway ESTERNI banali ----
     if compress_trivial_gateways:
         # calcola predecessori
         preds = {}
@@ -514,7 +509,7 @@ def normalize_cppn_components_and_workflow(
                     del compressed[s]
         mapped = compressed
 
-    # ---- (opzionale) boundary-only: tieni solo archi che toccano almeno un CPPS ----
+    # ---- boundary-only: tieni solo archi che toccano almeno un CPPS ----
     if boundary_only:
         boundary = {}
         for s, tgts in mapped.items():
@@ -552,7 +547,7 @@ def save_cppn_service(request):
         pub_res = publish_cppn_spec(group_id=data["group_id"], servers=servers)
 
         if pub_res.get("status") == "ok":
-            # link utili per la UI (come per i CPPS)
+            # link per la UI 
             json_url = reverse("openapi_docs:cppn-oas-latest", args=[data["group_id"]])
             swagger_url = reverse("openapi_docs:swagger-viewer-cppn", args=[data["group_id"]])
             doc_result, doc_status = {
@@ -610,7 +605,6 @@ def get_all_services(request):
             'task_id': 1,
             'name': 1,
             'description': 1,
-            # normalizza i nomi lato API se nel DB hai input_params/output_params
             'input': 1,
             'output': 1,
             'input_params': 1,
@@ -622,7 +616,7 @@ def get_all_services(request):
         }
     ))
 
-    # normalizzazione server-side: se input/output mancano, prendi input_params/output_params
+    # normalizzazione server-side
     for a in atomic:
         a['input']  = a.get('input')  or a.get('input_params')  or {}
         a['output'] = a.get('output') or a.get('output_params') or {}
@@ -661,26 +655,20 @@ def get_all_services(request):
         'cppn': cppn
     })
 
-
-
-
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from rest_framework import status
-
 @api_view(['DELETE'])
 def delete_group(request, group_id):
     try:
-        # Prova a cancellare dalla collezione CPPS
+        # Prova cancellare da CPPS
         deleted_cpps = cpps_collection.find_one_and_delete({'group_id': group_id})
-        # Prova a cancellare anche dalla collezione CPPN (nel caso tu voglia permettere delete per gruppi CPPN)
+
+        # Prova cancellare anche da CPPN
         deleted_cppn = cppn_collection.find_one_and_delete({'group_id': group_id})
 
         deleted_any = bool(deleted_cpps or deleted_cppn)
 
         # --- Pulizia riferimenti in altri documenti ---
 
-        # 1) rimozione da components e workflow
+        # rimozione da components e workflow
         pipeline = [
             { "$set": {
                 # components: rimuovi item con id == group_id (facoltativo filtrare anche per type == "CPPS")
@@ -737,7 +725,8 @@ def delete_group(request, group_id):
                     ]
                 }
             }},
-            # 2) rimuovi group_id da nested_cpps (se esiste e se è un array)
+
+            # rimuovo group_id da nested_cpps (se esiste e se è un array)
             { "$set": {
                 "nested_cpps": {
                     "$cond": [
@@ -760,7 +749,7 @@ def delete_group(request, group_id):
             "$or": [
                 {"components.id": group_id},
                 {f"workflow.{group_id}": {"$exists": True}},
-                {"workflow": {"$elemMatch": {"$in": [group_id]}}},  # non funziona con object, ma lasciamo gli altri due controlli
+                {"workflow": {"$elemMatch": {"$in": [group_id]}}},  # non funziona con object, lascio gli altri due controlli
                 {"nested_cpps": group_id}
             ]
         }
@@ -768,7 +757,7 @@ def delete_group(request, group_id):
         cpps_update = cpps_collection.update_many(match, pipeline)
         cppn_update = cppn_collection.update_many(match, pipeline)
 
-        # 3) Fallback: un pull semplice su nested_cpps per sicurezza (idempotente)
+        # 3) Fallback: un pull semplice su nested_cpps per sicurezza
         pull_nested = {"$pull": {"nested_cpps": group_id}}
         cpps_pull = cpps_collection.update_many({"nested_cpps": group_id}, pull_nested)
         cppn_pull = cppn_collection.update_many({"nested_cpps": group_id}, pull_nested)
@@ -784,7 +773,6 @@ def delete_group(request, group_id):
                 "pulled_cppn_nested": cppn_pull.modified_count
             }, status=status.HTTP_200_OK)
 
-        # Anche se non esisteva, comunichiamo cosa abbiamo ripulito
         return Response({
             "error": f"Gruppo {group_id} not found",
             "updated_cpps_docs": cpps_update.modified_count,
@@ -818,7 +806,7 @@ def add_nested_cpps(request, group_id):
 @api_view(['DELETE'])
 def delete_atomic(request, atomic_id):
     try:
-        # 1) Elimino l'atomic dalla sua collection
+        # Elimino atomic dalla sua collection
         deleted = atomic_services_collection.find_one_and_delete({'task_id': atomic_id})
         if not deleted:
             return Response({'error': 'Atomic service not found'}, status=404)
@@ -867,7 +855,7 @@ def delete_atomic(request, atomic_id):
             }}
         ]
 
-        # Applichiamo la pipeline a TUTTI i doc (è idempotente/cheap lato server)
+        # Applicazione la pipeline a TUTTI i doc
         cpps_result = cpps_collection.update_many({}, pipeline)
         cppn_result = cppn_collection.update_many({}, pipeline)
 
@@ -901,7 +889,6 @@ def delete_diagram_and_services(request, diagram_id):
         cppn_deleted = cppn_collection.delete_many({"diagram_id": diagram_id})
 
         # Elimina documentazione OpenAPI associata
-        from utilities.mongodb_handler import openapi_collection
         openapi_deleted = openapi_collection.delete_many({"info.x-diagram_id": diagram_id})
 
 

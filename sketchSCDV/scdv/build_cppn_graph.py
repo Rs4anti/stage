@@ -1,4 +1,3 @@
-# build_cppn_graph.py
 from collections import defaultdict
 from typing import Dict, List, Tuple, Optional, Set
 
@@ -49,7 +48,6 @@ def _label_atomic(node_id: str) -> str:
 def resolve_cpps_name_by_id(group_id: str) -> Optional[str]:
     return None
 
-# 3) aggiorna format_node per gestire ExternalAtomic
 def format_node(node_id: str, components: List[dict], workflow: Dict[str, list]) -> str:
     t = node_type(node_id, components, workflow).lower()
     if t == "atomic":
@@ -82,8 +80,6 @@ def find_starts(workflow: Dict[str, List[str]]) -> List[str]:
 
 def next_of(node_id: str, workflow: Dict[str, List[str]]) -> List[str]:
     return workflow.get(node_id, [])
-
-# ==================== Rendering compatto (no duplicati) ====================
 
 def render_branch_until_join(start: str,
                              workflow: Dict[str, List[str]],
@@ -284,8 +280,6 @@ def render_workflow_cppn(cppn_doc: dict) -> str:
     return " | ".join(filter(None, rendered))
 
 # ==================== Main ====================
-
-# Import collections dal tuo handler del progetto (stessa cartella 'utilities')
 from utilities.mongodb_handler import cppn_collection, cpps_collection
 
 if __name__ == "__main__":

@@ -1,12 +1,10 @@
 import os, traceback
-import uuid
 from tempfile import NamedTemporaryFile
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.shortcuts import render
 from rest_framework import status
-
-from utilities.bpmn_importer import BPMNImporterXmlBased  # Assicurati sia correttamente importata
+from utilities.bpmn_importer import BPMNImporterXmlBased
 
 def importer_home(request):
     return render(request, 'importer/home.html')
@@ -33,7 +31,7 @@ def upload_imported_diagram(request):
         return Response(result, status=status.HTTP_200_OK)
 
     except Exception as e:
-        traceback.print_exc()  # stampa in console Django il traceback completo
+        traceback.print_exc()  # stampa traceback completo
         return Response(
             {'error': f'{type(e).__name__}: {e}'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR

@@ -1,5 +1,6 @@
 from django.db import models
 
+#--------------NON USATO ORM DJANGO -> TUTTO IN MONGO-------------#
 class BPMNDiagram(models.Model):
     name = models.CharField(max_length=255)
     xml_content = models.TextField()  # BPMN XML

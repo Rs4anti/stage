@@ -8,7 +8,7 @@ class SwaggerUIView(TemplateView):
         ctx = super().get_context_data(**kwargs)
         service_id = self.kwargs["service_id"]
         version = self.kwargs.get("version")
-        # Se è passata una versione, usiamo l'endpoint versionato,
+        # Se è passata una versione, uso l'endpoint versionato,
         # altrimenti la latest.
         ctx["spec_url"] = reverse(
             "openapi_docs:atomic-oas-version",
