@@ -43,5 +43,14 @@ urlpatterns = [
     path("api/rbac/policies/atomic/permissions",
          views_rbac.update_atomic_permissions,
          name="rbac_atomic_update_permissions"),
+    
+    path("api/rbac/policies/cpps/by-diagram",  views_rbac.get_cpps_by_diagram, name="rbac_cpps_by_diagram"),
+
+    path("policies/cpps/", views_rbac.rbac_cpps_view, name="rbac_cpps"),
+    path("api/rbac/policies/cpps/one",         views_rbac.get_cpps_one,        name="rbac_cpps_one"),
+    path("api/rbac/policies/cpps/permissions", views_rbac.update_cpps_permissions, name="rbac_cpps_update_permissions"),
+
+    path("policies/cpps/<str:cpps_id>/edit/", views_rbac.rbac_cpps_edit, name="rbac_cpps_edit"),
+    path("policies/cppn/", views_rbac.rbac_cppn_view, name="rbac_cppn"),
 
 ]

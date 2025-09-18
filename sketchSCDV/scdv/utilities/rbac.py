@@ -67,6 +67,7 @@ class rbac:
 
     @staticmethod
     def cpps_policy(cpps_data, atomic_ids, cpps_ids):
+        cpps_name = cpps_data['name']
         diagram_id = cpps_data['diagram_id']
         service_type = 'cpps'
         group_id = cpps_data['group_id']
@@ -84,6 +85,7 @@ class rbac:
         #costruzione policy
         policy = {
             'diagram_id' : diagram_id,
+            'service_name' : cpps_name,
             "service_type" : service_type,
             "owner" : owner,
             "permissions": 
@@ -110,7 +112,7 @@ class rbac:
     
     @staticmethod
     def cppn_policy(cppn_data, components_cppn):
-
+        service_name = cppn_data['name']
         diagram_id = cppn_data['diagram_id']
         service_type = 'cppn'
         group_id = cppn_data['group_id']
@@ -144,6 +146,7 @@ class rbac:
             acm[owner][c] = "invoke"
 
         policy = {
+            'service_name' : service_name,
             'diagram_id' : diagram_id,
             "service_type" : service_type,
             "actors" : list(actors),

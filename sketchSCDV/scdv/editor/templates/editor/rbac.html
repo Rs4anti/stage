@@ -45,7 +45,7 @@
           <h5 class="card-title">CPPS Services</h5>
           <p class="text-muted small mb-3">View CPPS policies.</p>
           <!--{\% url 'rbac_policies_level' 'cpps' \%}-->
-          <a href="#" class="btn btn-primary">View</a>
+          <a href="{% url 'rbac_cpps' %}?id={{ request.GET.id }}" class="btn btn-primary">View</a>
         </div>
       </div>
     </div>
@@ -58,7 +58,7 @@
           <h5 class="card-title">CPPN Services</h5>
           <p class="text-muted small mb-3">View rbac CPPN policies.</p>
           <!--{\% url 'rbac_policies_level' 'cppn' \%}-->
-          <a href="#" class="btn btn-primary">View</a>
+          <a href="{% url 'rbac_cppn' %}?id={{ request.GET.id }}" class="btn btn-primary">View</a>
         </div>
       </div>
     </div>
