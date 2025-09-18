@@ -3,7 +3,7 @@
 <html lang="it">
 <head>
   <meta charset="utf-8">
-  <title>Edit Atomic Policy (proforma)</title>
+  <title>Edit Atomic Policy</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
@@ -40,11 +40,11 @@
       <div class="row g-3">
         <div class="col-md-6">
           <label class="form-label">Service Name</label>
-          <input id="service_name" class="form-control" placeholder="es. Send Data for Sales Order">
+          <input id="service_name" class="form-control" placeholder="es. Send Data for Sales Order" readonly>
         </div>
         <div class="col-md-3">
           <label class="form-label">Atomic Type</label>
-          <select id="atomic_type" class="form-select">
+          <select id="atomic_type" class="form-select" disabled>
             <option value="collect">collect</option>
             <option value="process&monitor">process&monitor</option>
             <option value="dispatch">dispatch</option>
@@ -53,7 +53,7 @@
         </div>
         <div class="col-md-3">
           <label class="form-label">Owner</label>
-          <input id="owner" class="form-control" placeholder="es. Production Leader">
+          <input id="owner" class="form-control" placeholder="es. Production Leader" readonly>
         </div>
       </div>
 
@@ -61,7 +61,7 @@
 
       <div class="d-flex align-items-center justify-content-between">
         <h6 class="mb-0">Permissions</h6>
-        <button type="button" class="btn btn-sm btn-outline-primary" id="addPermBtn">
+        <button type="button" class="btn btn-success" id="addPermBtn">
           + Add permission
         </button>
       </div>
@@ -69,7 +69,7 @@
 
 
       <div class="text-end mt-4">
-        <button type="button" class="btn btn-primary" disabled>Save (proforma)</button>
+        <button type="button" class="btn btn-primary" disabled>Save</button>
       </div>
     </div>
   </form>
@@ -114,7 +114,7 @@
       .join("");
 
     const selectActor = `
-      <select class="form-select form-select-sm perm-actor" ${readonly?'disabled':''} ${actor?'':'aria-placeholder="Select actor"'}>
+      <select class="form-select form-select-sm perm-actor" ${readonly ?'disabled': ''} ${actor?'':'aria-placeholder="Select actor"'}>
         <option value="" ${actor?'':'selected'} disabled>— select actor —</option>
         ${options}
       </select>`;
@@ -130,7 +130,7 @@
     ` : selectActor;
 
     const removeBtn = readonly ? "" :
-      `<button type="button" class="btn btn-sm btn-outline-danger" data-remove="${rowId}">Remove</button>`;
+      `<button type="button" class="btn btn-danger" data-remove="${rowId}">Revoke</button>`;
 
     return `
     <div class="row g-2 align-items-end mb-2 perm-row" data-row="${rowId}">
