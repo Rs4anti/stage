@@ -26,7 +26,7 @@
   </div>
 
   <div class="row flex-grow-1">
-    <aside class="col-2 bg-white shadow-sm p-3 overflow-auto">
+<aside class="col-2 bg-white shadow-sm p-3 overflow-auto">
   <h6 class="fw-bold mb-3">Available Services</h6>
 
   <div class="accordion" id="serviceAccordion">
@@ -66,7 +66,18 @@
       </div>
     </div>
   </div>
+
+  <!--Rbac policies button-->
+  <div class="mt-4">
+        <!--mi porto dietro l'id del diagramma-->
+        <a href="{% url 'rbac_policies' %}?id={{ request.GET.id }}"
+      class="btn btn-outline-primary">
+      RBAC Policies
+  </a>
+  </div>
 </aside>
+
+
 
 
     <main class="col-10 p-3">

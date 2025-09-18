@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views
+from . import views, views_rbac
 
 urlpatterns = [
     path('', views.data_view_editor, name='editor'),
@@ -23,5 +23,19 @@ urlpatterns = [
     path('api/delete-atomic/<str:atomic_id>/', views.delete_atomic),
 
     path('api/delete-diagram/<str:diagram_id>/', views.delete_diagram_and_services, name='delete_diagram_and_services'),
+
+    path('policies', views.rbac_policies_view, name='rbac_policies'),
+    path("policies/atomic/", views_rbac.rbac_atomic_view, name="rbac_atomic"),
+    path("policies/atomic/<str:atomic_id>/edit/", views_rbac.rbac_atomic_edit, name="rbac_atomic_edit"),
+
+    path("api/rbac/policies/atomic/by-diagram",
+         views_rbac.get_diagram_atomic_rbac,
+         name="rbac_atomic_by_diagram"),
+
+    path(
+        "api/rbac/policies/atomic/by-id",
+        views_rbac.get_atomic_policy_by_atomic_id,
+        name="rbac_atomic_by_atomic_id",
+    ),
 
 ]

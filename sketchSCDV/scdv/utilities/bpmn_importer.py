@@ -287,7 +287,10 @@ class BPMNImporterXmlBased:
                     }
 
                     MongoDBHandler.save_atomic(atomic_doc)
+
+                    print("##### CHIAMO RBAC.ATOMIC_POLICY con atomic_doc: ", atomic_doc)
                     rbac.atomic_policy(atomic_doc)
+
                     try:
                         pub = publish_atomic_spec(service_id=task_id, servers=self.servers)
                     except Exception as e:

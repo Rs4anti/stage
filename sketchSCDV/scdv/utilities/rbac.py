@@ -3,7 +3,8 @@ from .mongodb_handler import rbac_collection, atomic_services_collection, cpps_c
 class rbac:
     @staticmethod
     def atomic_policy(atomic_data):
-
+        diagram_id = atomic_data['diagram_id']
+        atomic_name = atomic_data['name']
         service_type = 'atomic'
         atomic_type = atomic_data['atomic_type']
         task_id = atomic_data['task_id']
@@ -24,6 +25,8 @@ class rbac:
 
         #costruzione policy
         policy = {
+            'diagram_id': diagram_id,
+            'service_name' : atomic_name,
             "service_type" : service_type,
             "atomic_type" : atomic_type,
             "owner" : owner,
@@ -64,6 +67,7 @@ class rbac:
 
     @staticmethod
     def cpps_policy(cpps_data, atomic_ids, cpps_ids):
+        diagram_id = cpps_data['diagram_id']
         service_type = 'cpps'
         group_id = cpps_data['group_id']
         components = atomic_ids
@@ -79,6 +83,7 @@ class rbac:
         
         #costruzione policy
         policy = {
+            'diagram_id' : diagram_id,
             "service_type" : service_type,
             "owner" : owner,
             "permissions": 
@@ -91,7 +96,7 @@ class rbac:
 
         try:
             result = rbac_collection.update_one(
-                {"cpps_id" : group_id},
+                {'cpps_id' : group_id},
                 {'$set': policy},
                 upsert=True
             )
@@ -106,6 +111,7 @@ class rbac:
     @staticmethod
     def cppn_policy(cppn_data, components_cppn):
 
+        diagram_id = cppn_data['diagram_id']
         service_type = 'cppn'
         group_id = cppn_data['group_id']
         
@@ -138,6 +144,7 @@ class rbac:
             acm[owner][c] = "invoke"
 
         policy = {
+            'diagram_id' : diagram_id,
             "service_type" : service_type,
             "actors" : list(actors),
             "permissions": [

@@ -19,6 +19,13 @@ from utilities.mongodb_handler import openapi_collection
 def data_view_editor(request):
     return render(request, 'editor/view.html')
 
+def rbac_policies_view(request):
+    service_id = request.GET.get("id")
+    # se serve, puoi filtrare subito
+    # policies = mongo_collection.find({"atomic_id": service_id}) ...
+    return render(request, "editor/rbac.html", {"service_id": service_id})
+
+
 def check_diagram_name(request):
     name = request.GET.get('name')
     if not name:
