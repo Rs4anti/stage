@@ -38,4 +38,10 @@ urlpatterns = [
         name="rbac_atomic_by_atomic_id",
     ),
 
+    path("api/actors", views_rbac.get_diagram_actors, name="diagram_actors"),
+
+    path("api/rbac/policies/atomic/permissions",
+         views_rbac.update_atomic_permissions,
+         name="rbac_atomic_update_permissions"),
+
 ]

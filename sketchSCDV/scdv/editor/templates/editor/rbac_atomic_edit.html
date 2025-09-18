@@ -87,17 +87,14 @@
     </div>`;
   }
 
-  // --- TODO: collega a una tua API che restituisce gli attori del diagramma
-  // es. GET /editor/api/actors?diagram_id=...
   async function fetchActors(diagramId){
-    // PROFORMA: valori statici di fallback (sostituisci con una fetch vera)
-    return [
-      "Production Leader",
-      "Mechanical PartSupplier",
-      "Forging ProcessSupplier",
-      "Customer"
-    ];
+    const url = "{% url 'diagram_actors' %}" + `?diagram_id=${encodeURIComponent(diagramId)}`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error("Cannot load actors");
+    const data = await r.json();
+    return data.actors || [];
   }
+
 
   // cache attori per non rifare fetch
   let _actorsCache = null;
@@ -249,6 +246,66 @@
 
   loadPolicy();
 </script>
+
+<script>
+  const API_UPDATE_PERMS = "{% url 'rbac_atomic_update_permissions' %}";
+
+  function getCookie(name){
+    const v = `; ${document.cookie}`.split(`; ${name}=`); 
+    if (v.length === 2) return v.pop().split(';').shift();
+  }
+  function alertHtml(kind, msg){
+    return `<div class="alert alert-${kind} alert-dismissible fade show" role="alert">
+      ${msg}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>`;
+  }
+
+  function readExtraPermissionActors(owner){
+    const rows = [...document.querySelectorAll("#permsList .perm-row")];
+    const actors = [];
+    for (const r of rows){
+      const sel = r.querySelector(".perm-actor");
+      if (!sel || sel.disabled) continue; // owner = disabled → saltato
+      const val = (sel.value || "").trim();
+      if (val && val !== owner) actors.push(val);
+    }
+    return [...new Set(actors)];
+  }
+
+  // Attiva Save
+  const saveBtn = document.querySelector('button.btn.btn-primary');
+  saveBtn.disabled = false;
+  saveBtn.addEventListener("click", async (e) => {
+    e.preventDefault();
+    const diagram_id = document.getElementById("diagram_id").value.trim();
+    const atomic_id  = document.getElementById("atomic_id").value.trim();
+    const owner      = document.getElementById("owner").value.trim();
+
+    const permission_actors = readExtraPermissionActors(owner);
+
+    const r = await fetch(API_UPDATE_PERMS, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCookie("csrftoken") || ""
+      },
+      body: JSON.stringify({ diagram_id, atomic_id, permission_actors })
+    });
+
+    const holder = document.getElementById("alertHolder") || (function(){
+      const div = document.createElement('div'); div.id = "alertHolder";
+      document.querySelector(".card .card-body").prepend(div); return div;
+    })();
+
+    const json = await r.json().catch(()=> ({}));
+    if (!r.ok){
+      holder.innerHTML = alertHtml('danger', json.detail || 'Saving error!');
+      return;
+    }
+    holder.innerHTML = alertHtml('success', 'Updated permissions.');
+  });
+</script>
+
 
 </body>
 </html>
