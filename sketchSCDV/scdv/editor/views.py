@@ -2,7 +2,7 @@ from django.shortcuts import render
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
-from utilities.mongodb_handler import atomic_services_collection, cpps_collection, cppn_collection, bpmn_collection, MongoDBHandler
+from utilities.mongodb_handler import rbac_collection, atomic_services_collection, cpps_collection, cppn_collection, bpmn_collection, MongoDBHandler
 from utilities.rbac import rbac
 from django.utils.timezone import now
 from rest_framework.response import Response
@@ -897,6 +897,9 @@ def delete_diagram_and_services(request, diagram_id):
 
         # Elimina documentazione OpenAPI associata
         openapi_deleted = openapi_collection.delete_many({"info.x-diagram_id": diagram_id})
+
+        # Elimina rbac dei servizi del diagramma
+        rbac_delted = rbac_collection.delete_many({"diagram_id": diagram_id})
 
 
         return Response({
