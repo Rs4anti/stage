@@ -39,24 +39,66 @@
 </div>
 
 <script>
-  // Placeholder: quando definiremo l’API useremo questo endpoint
-  // const API_CPPN_BY_DIAGRAM = "{\% url 'rbac_cppn_by_diagram' \%}";
-  // const API_ATOMIC_BY_DIAGRAM = "{\% url 'rbac_atomic_by_diagram' \%}"; // per mappa id->name
+  const API_CPPN_BY_DIAGRAM   = "{% url 'rbac_cppn_by_diagram' %}";
+  const API_ATOMIC_BY_DIAGRAM = "{% url 'rbac_atomic_by_diagram' %}";
 
-  // Per ora mostriamo solo il diagram_id e un placeholder
-  (function init(){
+  function esc(s){return (s??'').toString().replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+  function buildEditUrl(cppnId, diagramId){
+    const base = "{% url 'rbac_cppn_edit' 'CPPN_ID' %}".replace("CPPN_ID", encodeURIComponent(cppnId));
+    return `${base}?id=${encodeURIComponent(diagramId)}`;
+  }
+
+  function rowHtml(p, diagramId, nameMap){
+    const nameOf = id => nameMap[id] || id; // fallback all'id
+    const actors = (p.actors || []).join(", ");
+    const perms = (p.permissions||[])
+      .map(x => `${esc(x.actor)}, <code>${esc(nameOf(x.service))}</code> → ` +
+                `<span class="badge ${x.permission==='invoke'?'bg-success':'bg-secondary'}">${esc(x.permission)}</span>`)
+      .join("<br>") || "—";
+
+    const title = esc(p.service_name || p.cppn_id || "");
+    return `<tr>
+      <td><code>${title}</code></td>
+      <td>${esc(actors)}</td>
+      <td>${perms}</td>
+      <td class="text-end">
+        <a class="btn btn-sm btn-outline-primary" href="${buildEditUrl(p.cppn_id, diagramId)}">Edit</a>
+      </td>
+    </tr>`;
+  }
+
+  (async function load(){
     const params = new URLSearchParams(window.location.search);
     const diagramId = params.get("id");
     const tbody = document.getElementById("tbody");
-    if (!diagramId){
-      tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger py-4">diagram_id mancante nell'URL</td></tr>`;
+    if(!diagramId){
+      tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger py-4">diagram_id mancante</td></tr>`;
       return;
     }
-    // Placeholder fino a quando non colleghiamo l’API
-    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-4">
-      Pronto! Colleghiamo le API per caricare le CPPN policies del diagram <code>${diagramId}</code>.
-    </td></tr>`;
+
+    // 1) CPPN
+    const rC = await fetch(`${API_CPPN_BY_DIAGRAM}?id=${encodeURIComponent(diagramId)}`);
+    if(!rC.ok){ tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger py-4">API error (CPPN)</td></tr>`; return; }
+    const dataC = await rC.json();
+    const cppnList = dataC.results || [];
+
+    // 2) Atomic map (id -> service_name) per mostrare i nomi nelle permissions
+    const nameMap = {};
+    const rA = await fetch(`${API_ATOMIC_BY_DIAGRAM}?id=${encodeURIComponent(diagramId)}`);
+    if (rA.ok){
+      const dataA = await rA.json();
+      for(const a of (dataA.results||[])){
+        if (a.atomic_id) nameMap[a.atomic_id] = a.service_name || a.atomic_id;
+      }
+    }
+
+    // (Facoltativo) se tra i service ci sono Group_..., puoi mappare anche i CPPS caricandoli e aggiungendo nameMap[group_id] = cpps.service_name
+
+    const rows = cppnList.map(p => rowHtml(p, diagramId, nameMap)).join("")
+             || `<tr><td colspan="4" class="text-center text-muted py-4">Nessun documento CPPN</td></tr>`;
+    tbody.innerHTML = rows;
   })();
 </script>
+
 </body>
 </html>

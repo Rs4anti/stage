@@ -53,4 +53,25 @@ urlpatterns = [
     path("policies/cpps/<str:cpps_id>/edit/", views_rbac.rbac_cpps_edit, name="rbac_cpps_edit"),
     path("policies/cppn/", views_rbac.rbac_cppn_view, name="rbac_cppn"),
 
+     path("api/rbac/policies/cppn/by-diagram",
+         views_rbac.get_cppn_by_diagram,
+         name="rbac_cppn_by_diagram"),
+    
+    path("policies/cppn/<str:cppn_id>/edit/",
+         views_rbac.rbac_cppn_edit,
+         name="rbac_cppn_edit"),
+
+    path(
+        "policies/cppn/<str:cppn_id>/",
+        views_rbac.rbac_cppn_services_view,
+        name="rbac_cppn_services",
+    ),
+
+    # API: lista servizi (atomic/cpps) con attori che hanno invoke
+    path(
+        "api/rbac/policies/cppn/services",
+        views_rbac.get_cppn_services,
+        name="rbac_cppn_services_api",
+    ),
+
 ]
