@@ -82,8 +82,6 @@ def save_diagram(request, diagram_id=None):
 
         return Response({'id': diagram_id, 'status': 'updated'})
 
-
-
 def parse_param_list(param_list):
     parsed = []
     for item in param_list:
