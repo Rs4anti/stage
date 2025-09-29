@@ -21,12 +21,15 @@
     <div class="card-body">
       <div class="row g-3">
         <div class="col-md-6">
-          <label class="form-label">Diagram ID</label>
-          <input id="diagram_id" class="form-control" value="{{ diagram_id }}" readonly>
+          <label class="form-label">Diagram Name</label>
+          <input type="hidden" id="diagram_id" value="{{ diagram_id }}">
+          <input type="hidden" id="atomic_id"  value="{{ atomic_id }}">
+
+          <input id="diagram_name" class="form-control" value="{{ diagram_name }}" readonly>
         </div>
         <div class="col-md-6">
           <label class="form-label">Atomic ID</label>
-          <input id="atomic_id" class="form-control" value="{{ atomic_id }}" readonly>
+          <input id="atomic_name" class="form-control" value="{{ atomic_name }}" readonly>
         </div>
       </div>
     </div>
@@ -198,54 +201,65 @@
 
   // ---- Caricamento iniziale policy + render permissions
   async function loadPolicy(){
-    const atomicId  = document.getElementById("atomic_id").value;
-    const diagramId = document.getElementById("diagram_id").value;
-    const alertHolder = document.getElementById("alertHolder");
-    const permsList = document.getElementById("permsList");
+  const atomicId  = document.getElementById("atomic_id").value;
+  const diagramId = document.getElementById("diagram_id").value;
+  const alertHolder = document.getElementById("alertHolder");
+  const permsList = document.getElementById("permsList");
 
-    const qs = new URLSearchParams({ atomic_id: atomicId });
-    if (diagramId) qs.set("diagram_id", diagramId);
+  const qs = new URLSearchParams({ atomic_id: atomicId });
+  if (diagramId) qs.set("diagram_id", diagramId);
 
-    const res = await fetch(`${API_GET_BY_ATOMIC_ID}?${qs.toString()}`);
-    const actors = await getActors(diagramId);
+  const res = await fetch(`${API_GET_BY_ATOMIC_ID}?${qs.toString()}`);
+  const actors = await getActors(diagramId);
 
-    if (res.status === 404){
-      // non c’è ancora la policy: mostra solo owner (se lo conosci) o lascia vuoto
-      const owner = document.getElementById("owner").value.trim();
-      permsList.innerHTML = "";
-      if (owner){
-        addPermissionRow({actors, actor:owner, readonly:true, ownerActor:owner});
-      }
-      return;
-    }
-    if (!res.ok){
-      const txt = await res.text().catch(()=> '');
-      alertHolder.innerHTML = alertHtml('danger', `Errore caricamento (${res.status}): ${esc(txt)}`);
-      permsList.innerHTML = "";
-      return;
-    }
-
-    const data = await res.json();
-    // campi base
-    document.getElementById("service_name").value = data.service_name || '';
-    document.getElementById("atomic_type").value  = data.atomic_type || 'collect';
-    document.getElementById("owner").value        = data.owner || '';
-
-    const owner = data.owner || '';
+  if (res.status === 404){
+    const owner = document.getElementById("owner").value.trim();
     permsList.innerHTML = "";
-
-    // 1) riga OWNER (read-only), se presente
     if (owner){
       addPermissionRow({actors, actor:owner, readonly:true, ownerActor:owner});
     }
-
-    // 2) altre permissions (solo attori ≠ owner)
-    const extra = Array.isArray(data.permissions) ? data.permissions.filter(p => p.actor !== owner) : [];
-    for (const p of extra){
-      addPermissionRow({actors, actor:p.actor, readonly:false, ownerActor:owner});
-      // permission è sempre invoke (da modello), quindi non servono set aggiuntivi
-    }
+    return;
   }
+  if (!res.ok){
+    const txt = await res.text().catch(()=> '');
+    alertHolder.innerHTML = alertHtml('danger', `Errore caricamento (${res.status}): ${esc(txt)}`);
+    permsList.innerHTML = "";
+    return;
+  }
+
+  const data = await res.json();
+
+  // aggiorna intestazioni/nomi se presenti
+  if (data.diagram_name) {
+    const dn = document.getElementById("diagram_name");
+    if (dn) dn.value = data.diagram_name;
+  }
+  if (data.service_name || data.atomic_name) {
+    const sname = data.service_name || data.atomic_name;
+    const an = document.getElementById("atomic_name");
+    if (an) an.value = sname;
+    // opzionale: mettilo anche nel titolo
+    const h = document.querySelector("h4.mb-0");
+    if (h) h.textContent = `Edit Atomic Policy — ${sname}`;
+  }
+
+  // campi base del form
+  document.getElementById("service_name").value = data.service_name || data.atomic_name || '';
+  document.getElementById("atomic_type").value  = data.atomic_type || 'collect';
+  document.getElementById("owner").value        = data.owner || '';
+
+  const owner = data.owner || '';
+  permsList.innerHTML = "";
+
+  if (owner){
+    addPermissionRow({actors, actor:owner, readonly:true, ownerActor:owner});
+  }
+
+  const extra = Array.isArray(data.permissions) ? data.permissions.filter(p => p.actor !== owner) : [];
+  for (const p of extra){
+    addPermissionRow({actors, actor:p.actor, readonly:false, ownerActor:owner});
+  }
+}
 
   loadPolicy();
 </script>

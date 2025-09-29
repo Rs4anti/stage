@@ -1,10 +1,11 @@
-from utilities.mongodb_handler import rbac_collection
+from utilities.mongodb_handler import rbac_collection, bpmn_collection
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import render
 from datetime import datetime
 from bson import ObjectId
+from bson import ObjectId, errors as bson_errors
 
 @api_view(['GET'])
 def get_diagram_atomic_rbac(request):
@@ -204,11 +205,8 @@ def get_cpps_by_diagram(request):
 
 @api_view(["GET"])
 def get_cpps_one(request):
-    """
-    GET /editor/api/rbac/policies/cpps/one?diagram_id=...&cpps_id=...
-    """
     diagram_id = request.query_params.get("diagram_id")
-    cpps_id = request.query_params.get("cpps_id")
+    cpps_id    = request.query_params.get("cpps_id")
     if not diagram_id or not cpps_id:
         return Response({"detail": "diagram_id e cpps_id sono obbligatori."}, status=400)
 
@@ -216,7 +214,48 @@ def get_cpps_one(request):
     doc = rbac_collection.find_one(q)
     if not doc:
         return Response({"detail": "Policy non trovata."}, status=404)
-    return Response(_stringify_ids(doc), status=200)
+
+    # --- lookup nome diagramma (come già avevi) ---
+    diagram_name = None
+    try:
+        d = bpmn_collection.find_one({"_id": ObjectId(diagram_id)}, {"name": 1})
+    except bson_errors.InvalidId:
+        d = bpmn_collection.find_one({"_id": diagram_id}, {"name": 1})
+    if d:
+        diagram_name = d.get("name")
+
+    payload = _stringify_ids(doc)
+    try:
+        payload["diagram_id"] = str(ObjectId(diagram_id))
+    except bson_errors.InvalidId:
+        payload["diagram_id"] = str(diagram_id)
+    if diagram_name:
+        payload["diagram_name"] = diagram_name
+    if payload.get("service_name"):
+        payload["cpps_name"] = payload["service_name"]
+
+    # --- NEW: risolvi i nomi delle attività del CPPS ---
+    services_ids = sorted({(p.get("service") or "").strip()
+                           for p in (doc.get("permissions") or [])
+                           if (p.get("service") or "").strip()})
+    services_resolved = []
+    if services_ids:
+        cursor = rbac_collection.find(
+            {"diagram_id": diagram_id, "service_type": "atomic", "atomic_id": {"$in": services_ids}},
+            {"atomic_id": 1, "service_name": 1, "_id": 0}
+        )
+        # mappa id -> name
+        name_map = {d.get("atomic_id"): (d.get("service_name") or d.get("atomic_id"))
+                    for d in cursor}
+        for sid in services_ids:
+            services_resolved.append({
+                "service_id": sid,
+                "service_name": name_map.get(sid, sid)  # fallback all’ID se non trovato
+            })
+    payload["services_resolved"] = services_resolved
+
+    return Response(payload, status=200)
+
 
 @api_view(["PUT"])
 def update_cpps_permissions(request):

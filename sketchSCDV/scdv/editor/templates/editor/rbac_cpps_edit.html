@@ -18,12 +18,16 @@
     <div class="card-body">
       <div class="row g-3">
         <div class="col-md-6">
-          <label class="form-label">Diagram ID</label>
-          <input id="diagram_id" class="form-control" value="{{ diagram_id }}" readonly>
+          <label class="form-label">Diagram name</label>
+          <input id="diagram_name" class="form-control" value="{{ diagram_name }}" readonly>
         </div>
         <div class="col-md-6">
-          <label class="form-label">CPPS ID</label>
-          <input id="cpps_id" class="form-control" value="{{ cpps_id }}" readonly>
+          <label class="form-label">CPPS name</label>
+          <input id="cpps_name" class="form-control" value="{{ cpps_name }}" readonly>
+
+          <!-- ID nascosti per API -->
+          <input type="hidden" id="diagram_id" value="{{ diagram_id }}">
+          <input type="hidden" id="cpps_id"    value="{{ cpps_id }}">
         </div>
       </div>
     </div>
@@ -71,10 +75,15 @@
   async function fetchActors(diagramId){
     const r = await fetch(`${API_ACTORS}?diagram_id=${encodeURIComponent(diagramId)}`);
     if(!r.ok) throw new Error("Cannot load actors");
-    const data = await r.json(); return data.actors || [];
+    const data = await r.json(); 
+    return data.actors || [];
   }
 
-  function badge(code){ return `<span class="badge bg-light text-body-secondary border">${esc(code)}</span>`; }
+function badge(label, titleAttr){
+  const title = titleAttr ? ` title="${esc(titleAttr)}"` : "";
+  return `<span class="badge bg-light text-body-secondary border"${title}>${esc(label)}</span>`;
+}
+
 
   function readExtraActors(owner){
     return [...document.querySelectorAll(".perm-row select.perm-actor")]
@@ -107,6 +116,7 @@
       </div>`;
   }
 
+  // remove row
   document.addEventListener("click", (e)=>{
     const btn = e.target.closest("button[data-remove]");
     if(!btn) return;
@@ -114,6 +124,7 @@
     if (row) row.remove();
   });
 
+  // avoid duplicates
   document.addEventListener("change", (e)=>{
     if(!e.target.classList.contains("perm-actor")) return;
     const chosen = e.target.value;
@@ -128,10 +139,13 @@
   });
 
   let ACTORS = [];
+
   async function load(){
-    const diagram_id = document.getElementById("diagram_id").value;
-    const cpps_id    = document.getElementById("cpps_id").value;
+    // hidden IDs iniziali
+    let diagram_id = document.getElementById("diagram_id").value;
+    const cpps_id  = document.getElementById("cpps_id").value;
     const alertHolder = document.getElementById("alertHolder");
+
     const r = await fetch(`${API_GET_ONE}?diagram_id=${encodeURIComponent(diagram_id)}&cpps_id=${encodeURIComponent(cpps_id)}`);
     if(!r.ok){
       const txt = await r.text().catch(()=> "");
@@ -139,12 +153,45 @@
       return;
     }
     const data = await r.json();
+
+    // --- Nomi leggibili dal backend ---
+    if (data.diagram_name) {
+      const dn = document.getElementById("diagram_name");
+      if (dn) dn.value = data.diagram_name;
+    }
+    if (data.cpps_name || data.service_name) {
+      const cn = document.getElementById("cpps_name");
+      if (cn) cn.value = data.cpps_name || data.service_name;
+      const h = document.querySelector("h4.mb-0");
+      if (h) h.textContent = `Edit CPPS Policy — ${data.cpps_name || data.service_name}`;
+    }
+
+    // Se l'API normalizza gli ID, sincronizza gli hidden
+    if (data.diagram_id) {
+      document.getElementById("diagram_id").value = data.diagram_id;
+      diagram_id = data.diagram_id; // usa quello normalizzato per le fetch successive
+    }
+
+    // --- Dati base ---
     document.getElementById("owner").value = data.owner || "";
 
-    // compose services box (unique)
-    const services = Array.from(new Set((data.permissions||[]).map(p => p.service).filter(Boolean))).sort();
-    document.getElementById("servicesBox").innerHTML = services.length ? services.map(badge).join(" ") : '<span class="text-muted">—</span>';
+    // activities list
+      let servicesHtml = '<span class="text-muted">—</span>';
 
+if (Array.isArray(data.services_resolved) && data.services_resolved.length){
+  servicesHtml = data.services_resolved
+    .map(s => badge(s.service_name || s.service_id, s.service_id))
+    .join(" ");
+} else {
+  const services = Array.from(new Set((data.permissions||[])
+                    .map(p => p.service).filter(Boolean))).sort();
+  if (services.length){
+    servicesHtml = services.map(s => badge(s)).join(" ");
+  }
+}
+document.getElementById("servicesBox").innerHTML = servicesHtml;
+
+    // attori
     ACTORS = await fetchActors(diagram_id);
 
     const owner = data.owner || "";
@@ -156,7 +203,7 @@
       permissionRowHTML({rowId: crypto.randomUUID(), actors: ACTORS, actor: owner, readonly:true, ownerActor: owner})
     );
 
-    // extra rows (actors ≠ owner) - da permissions attuali deduciamo gli attori presenti
+    // extra rows (actors ≠ owner)
     const extraActors = Array.from(new Set((data.permissions||[])
                           .filter(p => p.actor && p.actor !== owner)
                           .map(p => p.actor)));
@@ -168,14 +215,17 @@
     }
 
     document.getElementById("saveBtn").disabled = false;
-
-    // Add button
-    document.getElementById("addPermBtn").addEventListener("click", ()=>{
-      permsList.insertAdjacentHTML("beforeend",
-        permissionRowHTML({rowId: crypto.randomUUID(), actors: ACTORS, actor: "", readonly:false, ownerActor: owner})
-      );
-    });
   }
+
+  // Add actor (listener unico fuori da load)
+  document.getElementById("addPermBtn").addEventListener("click", ()=>{
+    const owner = document.getElementById("owner").value.trim();
+    const permsList = document.getElementById("permsList");
+    permsList.insertAdjacentHTML("beforeend",
+      permissionRowHTML({rowId: crypto.randomUUID(), actors: ACTORS, actor: "", readonly:false, ownerActor: owner})
+    );
+  });
+
   load();
 
   // SAVE
@@ -184,7 +234,7 @@
     const diagram_id = document.getElementById("diagram_id").value.trim();
     const cpps_id    = document.getElementById("cpps_id").value.trim();
     const owner      = document.getElementById("owner").value.trim();
-    const extra = readExtraActors(owner);
+    const extra      = readExtraActors(owner);
 
     const r = await fetch(API_UPDATE, {
       method: "PUT",
