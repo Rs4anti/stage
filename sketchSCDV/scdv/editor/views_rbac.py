@@ -218,11 +218,11 @@ def get_cpps_by_diagram(request):
         return Response({"detail": "diagram_id is mandatory."},
                         status=status.HTTP_400_BAD_REQUEST)
 
-    # 1) Carico i doc CPPS RBAC
+    # Carico i doc CPPS RBAC
     q = {"diagram_id": diagram_id, "service_type": "cpps"}
     docs = list(rbac_collection.find(q))
 
-    # 2) Raccogli tutti i service_id che compaiono nelle permissions
+    #Raccolta tutti i service_id che compaiono nelle permissions
     service_ids = set()
     for d in docs:
         for p in (d.get("permissions") or []):
@@ -234,11 +234,11 @@ def get_cpps_by_diagram(request):
     if not service_ids:
         return Response({"count": len(docs), "results": _stringify_ids(docs)}, status=200)
 
-    # 3) Costruisco una mappa ID -> name risolvendo prima da RBAC (atomic, cpps),
+    #Costruisco una mappa ID -> name risolvendo prima da RBAC (atomic, cpps),
     #    poi dalle collection funzionali come fallback.
     name_map: dict[str, str] = {}
 
-    # 3a) Risoluzione nomi da RBAC ATOMIC (atomic_id -> service_name)
+    #Risoluzione nomi da RBAC ATOMIC (atomic_id -> service_name)
     atomic_cursor = rbac_collection.find(
         {"diagram_id": diagram_id, "service_type": "atomic", "atomic_id": {"$in": list(service_ids)}},
         {"atomic_id": 1, "service_name": 1, "_id": 0}
@@ -246,7 +246,7 @@ def get_cpps_by_diagram(request):
     for a in atomic_cursor:
         name_map[a["atomic_id"]] = a.get("service_name") or a["atomic_id"]
 
-    # 3b) Risoluzione nomi da RBAC CPPS (cpps_id -> service_name), per i Group_*
+    #Risoluzione nomi da RBAC CPPS (cpps_id -> service_name), per i Group_*
     cpps_cursor = rbac_collection.find(
         {"diagram_id": diagram_id, "service_type": "cpps", "cpps_id": {"$in": list(service_ids)}},
         {"cpps_id": 1, "service_name": 1, "_id": 0}
@@ -254,10 +254,9 @@ def get_cpps_by_diagram(request):
     for c in cpps_cursor:
         name_map[c["cpps_id"]] = c.get("service_name") or c["cpps_id"]
 
-    # 3c) Fallback: collezioni funzionali se qualche ID non è ancora risolto
+    #Fallback: collezioni funzionali se qualche ID non è ancora risolto
     missing = service_ids - set(name_map.keys())
     if missing:
-        # atomic services collection (task_id -> name)
         from utilities.mongodb_handler import atomic_services_collection, cpps_collection
         cur_a = atomic_services_collection.find(
             {"diagram_id": diagram_id, "task_id": {"$in": list(missing)}},
@@ -276,7 +275,6 @@ def get_cpps_by_diagram(request):
             for c in cur_c:
                 name_map[c["group_id"]] = c.get("name") or c["group_id"]
 
-    # 4) Arricchisco le permissions con 'service_name'
     enriched = []
     for d in docs:
         dd = _stringify_ids(d)
@@ -320,7 +318,7 @@ def get_cpps_one(request):
     if payload.get("service_name"):
         payload["cpps_name"] = payload["service_name"]
 
-    # --- NEW: risolvi i nomi delle attività/servizi del CPPS (atomic + cpps annidati) ---
+    # ---risolti i nomi delle attività/servizi del CPPS (atomic + cpps annidati) ---
     services_ids = sorted({(p.get("service") or "").strip()
                            for p in (doc.get("permissions") or [])
                            if (p.get("service") or "").strip()})
@@ -388,12 +386,12 @@ def update_cpps_permissions(request):
 
     Logica:
     - Carica il doc RBAC del CPPS. Se non esiste -> 404.
-    - Ricava l’insieme delle activities del CPPS: unione dei campi 'service'
-      presenti nelle permissions esistenti (tipicamente quelle dell’owner).
+    - Ricava l'insieme delle activities del CPPS: unione dei campi 'service'
+      presenti nelle permissions esistenti (tipicamente quelle dell'owner).
     - Ricostruisce completamente 'permissions' del CPPS come:
         owner → invoke su TUTTE le service
         per ogni actor in permission_actors → invoke su TUTTE le service
-    - Propaga l’aggiornamento ai documenti CPPN del DIAGRAM che referenziano questo CPPS:
+    - Propaga l'aggiornamento ai documenti CPPN del DIAGRAM che referenziano questo CPPS:
         (actor, service=cpps_id, 'invoke') solo per gli attori correnti (owner + extra).
       (overlay pulito: nessuna tupla 'none')
     """
@@ -430,7 +428,6 @@ def update_cpps_permissions(request):
         seen.add(k)
         extra.append(a)
 
-    # ricostruisci permissions CPPS = owner + extras, su TUTTE le service
     new_permissions = []
     if services:
         for s in services:
@@ -438,14 +435,11 @@ def update_cpps_permissions(request):
             for a in extra:
                 new_permissions.append({"actor": a, "service": s, "permission": "invoke"})
     else:
-        # CPPS senza elenco activities? mantieni comunque l'informazione actor-side per coerenza futura
-        # (non creiamo tuple vuote; semplicemente niente 'permissions' fino a quando non ci sono services)
         new_permissions = []
 
     rbac_collection.update_one(q, {"$set": {"permissions": new_permissions, "updated_at": datetime.utcnow()}})
     out = rbac_collection.find_one(q)
 
-    # --- SYNC CPPN overlay (service = cpps_id) ---
     # lista finale attori con invoke sul CPPS (owner + extra)
     actors_invoke = sorted({owner, *extra} - {""})
     cppn_sync = sync_cppn_on_service_change(
@@ -754,10 +748,6 @@ def get_cppn_services(request):
         })
 
     return Response(_S({"count": len(results), "results": results}), status=status.HTTP_200_OK)
-
-
-# Landing page HTML
-from django.shortcuts import render
 
 def rbac_cppn_services_view(request, cppn_id: str):
     # passa diagram_id (dalla query string) e il cppn_id al template

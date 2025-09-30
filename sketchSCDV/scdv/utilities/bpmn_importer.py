@@ -46,7 +46,7 @@ class BPMNImporterXmlBased:
 
         result = bpmn_collection.insert_one(doc)
         self.diagram_id = result.inserted_id
-        print(f"Diagramma salvato con ID: {self.diagram_id}")
+        print(f"ID Diagram saved: {self.diagram_id}")
 
 
     def _extract_workflow_cpps(self, group_id, members):
@@ -287,8 +287,6 @@ class BPMNImporterXmlBased:
                     }
 
                     MongoDBHandler.save_atomic(atomic_doc)
-
-                    print("##### CHIAMO RBAC.ATOMIC_POLICY con atomic_doc: ", atomic_doc)
                     rbac.atomic_policy(atomic_doc)
 
                     try:
@@ -297,9 +295,9 @@ class BPMNImporterXmlBased:
                         pub = {"status": "error", "errors": [f"{type(e).__name__}: {e}"]}
 
                     atomic_count += 1
-                    print(f"Atomic salvato: {task_name}")
+                    print(f"Atomic saved: {task_name}")
                 else:
-                    print(f"Nessuna <atomicExtension> per il task: {task_name}")
+                    print(f"No <atomicExtension> for: {task_name}")
 
         # ------------------------ PARTIZIONA GROUP ------------------------
         group_to_elements = self._extract_group_members()
@@ -439,7 +437,7 @@ class BPMNImporterXmlBased:
                 print(f"CPPN publish failed {group_id}: {type(e).__name__}: {e}")
 
             cppn_count += 1
-            print(f"🧠 CPPN salvato: {group_id}")
+            print(f"CPPN saved: {group_id}")
 
             # Posticipa RBAC: ora accodiamo e lo eseguiremo alla fine
             cppn_docs_to_rbac.append((cppn_doc, components_norm))
