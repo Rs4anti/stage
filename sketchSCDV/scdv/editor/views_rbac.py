@@ -65,8 +65,10 @@ def get_atomic_policy_by_atomic_id(request):
     """
     atomic_id = request.query_params.get("atomic_id")
     if not atomic_id:
-        return Response({"detail": "Parametro 'atomic_id' obbligatorio."},
-                        status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {"detail": "Parametro 'atomic_id' obbligatorio."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
     q = {"service_type": "atomic", "atomic_id": atomic_id}
     diagram_id = request.query_params.get("diagram_id")
@@ -77,7 +79,23 @@ def get_atomic_policy_by_atomic_id(request):
     if not doc:
         return Response({"detail": "Policy non trovata."}, status=status.HTTP_404_NOT_FOUND)
 
-    return Response(_sanitize(doc), status=status.HTTP_200_OK)
+    payload = _sanitize(doc)
+
+    # --- aggiungi diagram_name se possibile ---
+    if diagram_id:
+        try:
+            d = bpmn_collection.find_one({"_id": ObjectId(diagram_id)}, {"name": 1})
+        except bson_errors.InvalidId:
+            d = bpmn_collection.find_one({"_id": diagram_id}, {"name": 1})
+        if d:
+            payload["diagram_name"] = d.get("name")
+
+    # opzionale: coerenza nei nomi
+    if payload.get("service_name"):
+        payload["atomic_name"] = payload["service_name"]
+
+    return Response(payload, status=status.HTTP_200_OK)
+
 
 
 @api_view(["GET"])
