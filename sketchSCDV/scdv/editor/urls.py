@@ -74,4 +74,8 @@ urlpatterns = [
         name="rbac_cppn_services_api",
     ),
 
+    path("api/rbac/policies/cppn/one",         views_rbac.get_cppn_one,          name="rbac_cppn_one"),
+    path("api/rbac/policies/cppn/permissions", views_rbac.update_cppn_permissions, name="rbac_cppn_update_permissions"),
+
+
 ]

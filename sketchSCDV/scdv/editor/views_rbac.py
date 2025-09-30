@@ -527,7 +527,7 @@ def rbac_cppn_edit(request, cppn_id):
 def get_cppn_one(request):
     """
     GET /editor/api/rbac/policies/cppn/one?diagram_id=...&cppn_id=...
-    Ritorna il documento CPPN. (Non filtriamo qui: la pagina edit gestirà la UI sugli invoke)
+    Restituisce il doc CPPN con nomi servizi risolti e metadati per l'edit.
     """
     diagram_id = request.query_params.get("diagram_id")
     cppn_id    = request.query_params.get("cppn_id")
@@ -539,7 +539,129 @@ def get_cppn_one(request):
     if not doc:
         return Response({"detail": "Policy CPPN non trovata."}, status=404)
 
-    return Response(_stringify_ids(doc), status=200)
+    # Nome diagramma
+    diagram_name = None
+    try:
+        d = bpmn_collection.find_one({"_id": ObjectId(diagram_id)}, {"name": 1})
+    except bson_errors.InvalidId:
+        d = bpmn_collection.find_one({"_id": diagram_id}, {"name": 1})
+    if d:
+        diagram_name = d.get("name")
+
+    payload = _stringify_ids(doc)
+    if diagram_name:
+        payload["diagram_name"] = diagram_name
+    if payload.get("service_name"):
+        payload["cppn_name"] = payload["service_name"]
+
+    # Servizi membri del CPPN (da members, se c'è; altrimenti dalle permissions)
+    svc_ids = set(payload.get("members") or [])
+    if not svc_ids:
+        for p in (doc.get("permissions") or []):
+            sid = (p.get("service") or "").strip()
+            if sid: svc_ids.add(sid)
+
+    # Risoluzione nomi (atomic + cpps)
+    services_resolved = []
+    if svc_ids:
+        name_map = {}
+
+        # atomic in RBAC
+        cur_a = rbac_collection.find(
+            {"diagram_id": diagram_id, "service_type":"atomic", "atomic_id": {"$in": list(svc_ids)}},
+            {"atomic_id": 1, "service_name": 1, "_id": 0}
+        )
+        for a in cur_a:
+            name_map[a["atomic_id"]] = a.get("service_name") or a["atomic_id"]
+
+        # cpps in RBAC
+        cur_c = rbac_collection.find(
+            {"diagram_id": diagram_id, "service_type":"cpps", "cpps_id": {"$in": list(svc_ids)}},
+            {"cpps_id": 1, "service_name": 1, "_id": 0}
+        )
+        for c in cur_c:
+            name_map[c["cpps_id"]] = c.get("service_name") or c["cpps_id"]
+
+        # fallback (opzionale) su collezioni funzionali come fatto per i CPPS
+
+        for sid in sorted(svc_ids):
+            services_resolved.append({
+                "service_id": sid,
+                "service_name": name_map.get(sid, sid)
+            })
+
+    payload["services_resolved"] = services_resolved
+    return Response(payload, status=200)
+
+@api_view(["GET"])
+def get_cppn_one(request):
+    """
+    GET /editor/api/rbac/policies/cppn/one?diagram_id=...&cppn_id=...
+    Restituisce il doc CPPN con nomi servizi risolti e metadati per l'edit.
+    """
+    diagram_id = request.query_params.get("diagram_id")
+    cppn_id    = request.query_params.get("cppn_id")
+    if not diagram_id or not cppn_id:
+        return Response({"detail": "diagram_id e cppn_id sono obbligatori."}, status=400)
+
+    q = {"diagram_id": diagram_id, "cppn_id": cppn_id, "service_type": "cppn"}
+    doc = rbac_collection.find_one(q)
+    if not doc:
+        return Response({"detail": "Policy CPPN non trovata."}, status=404)
+
+    # Nome diagramma
+    diagram_name = None
+    try:
+        d = bpmn_collection.find_one({"_id": ObjectId(diagram_id)}, {"name": 1})
+    except bson_errors.InvalidId:
+        d = bpmn_collection.find_one({"_id": diagram_id}, {"name": 1})
+    if d:
+        diagram_name = d.get("name")
+
+    payload = _stringify_ids(doc)
+    if diagram_name:
+        payload["diagram_name"] = diagram_name
+    if payload.get("service_name"):
+        payload["cppn_name"] = payload["service_name"]
+
+    # Servizi membri del CPPN (da members, se c'è; altrimenti dalle permissions)
+    svc_ids = set(payload.get("members") or [])
+    if not svc_ids:
+        for p in (doc.get("permissions") or []):
+            sid = (p.get("service") or "").strip()
+            if sid: svc_ids.add(sid)
+
+    # Risoluzione nomi (atomic + cpps)
+    services_resolved = []
+    if svc_ids:
+        name_map = {}
+
+        # atomic in RBAC
+        cur_a = rbac_collection.find(
+            {"diagram_id": diagram_id, "service_type":"atomic", "atomic_id": {"$in": list(svc_ids)}},
+            {"atomic_id": 1, "service_name": 1, "_id": 0}
+        )
+        for a in cur_a:
+            name_map[a["atomic_id"]] = a.get("service_name") or a["atomic_id"]
+
+        # cpps in RBAC
+        cur_c = rbac_collection.find(
+            {"diagram_id": diagram_id, "service_type":"cpps", "cpps_id": {"$in": list(svc_ids)}},
+            {"cpps_id": 1, "service_name": 1, "_id": 0}
+        )
+        for c in cur_c:
+            name_map[c["cpps_id"]] = c.get("service_name") or c["cpps_id"]
+
+        # fallback (opzionale) su collezioni funzionali come fatto per i CPPS
+
+        for sid in sorted(svc_ids):
+            services_resolved.append({
+                "service_id": sid,
+                "service_name": name_map.get(sid, sid)
+            })
+
+    payload["services_resolved"] = services_resolved
+    return Response(payload, status=200)
 
 
 def _S(x):
@@ -704,3 +826,79 @@ def sync_cppn_on_service_change(diagram_id: str, service_id: str, actors_invoke:
         modified += res.modified_count
 
     return {"matched_cppn": matched, "modified_cppn": modified}
+
+
+@api_view(["PUT"])
+def update_cppn_permissions(request):
+    """
+    PUT /editor/api/rbac/policies/cppn/permissions
+    Body JSON:
+    {
+      "diagram_id": "...",             # obbligatorio
+      "cppn_id": "...",                # obbligatorio
+      "permission_actors": ["A1","A2"] # attori extra (≠ owner)
+    }
+
+    Ricostruisce le tuple (actor, service -> 'invoke') per TUTTI i servizi membri del CPPN.
+    """
+    body = request.data if isinstance(request.data, dict) else {}
+    diagram_id = (body.get("diagram_id") or "").strip()
+    cppn_id    = (body.get("cppn_id") or "").strip()
+    if not diagram_id or not cppn_id:
+        return Response({"detail": "diagram_id e cppn_id sono obbligatori."}, status=status.HTTP_400_BAD_REQUEST)
+
+    q = {"diagram_id": diagram_id, "cppn_id": cppn_id, "service_type": "cppn"}
+    doc = rbac_collection.find_one(q, {"_id": 0})
+    if not doc:
+        return Response({"detail": "Policy CPPN non trovata."}, status=status.HTTP_404_NOT_FOUND)
+
+    owner = (doc.get("owner") or "").strip()
+
+    # Membri: usa 'members' se presente, altrimenti derivali dalle permissions
+    members = set(doc.get("members") or [])
+    if not members:
+        for p in (doc.get("permissions") or []):
+            sid = (p.get("service") or "").strip()
+            if sid: members.add(sid)
+    members = sorted(members)
+
+    # normalizza attori extra
+    raw_extra = body.get("permission_actors") or []
+    if not isinstance(raw_extra, list):
+        return Response({"detail": "permission_actors deve essere una lista."}, status=status.HTTP_400_BAD_REQUEST)
+
+    seen = set()
+    extra = []
+    for a in raw_extra:
+        a = (a or "").strip()
+        if not a or a.lower() == (owner or "").lower():
+            continue
+        k = a.lower()
+        if k in seen:  # unici case-insensitive
+            continue
+        seen.add(k)
+        extra.append(a)
+
+    # ricostruisci permissions CPPN: owner + extras, su TUTTI i members
+    new_permissions = []
+    for s in members:
+        if owner:
+            new_permissions.append({"actor": owner, "service": s, "permission": "invoke"})
+        for a in extra:
+            new_permissions.append({"actor": a, "service": s, "permission": "invoke"})
+
+    # aggiorna anche 'actors' (partecipanti)
+    new_actors = sorted({*(doc.get("actors") or []), *(x for x in [owner, *extra] if x)})
+
+    rbac_collection.update_one(
+        q,
+        {"$set": {
+            "permissions": new_permissions,
+            "actors": new_actors,
+            "members": members,
+            "updated_at": datetime.utcnow()
+        }}
+    )
+    out = rbac_collection.find_one(q)
+
+    return Response({"status": "permissions_updated", "result": _stringify_ids(out)}, status=status.HTTP_200_OK)
