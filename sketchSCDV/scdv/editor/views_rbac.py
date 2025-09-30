@@ -192,16 +192,84 @@ def update_atomic_permissions(request):
 def get_cpps_by_diagram(request):
     """
     GET /editor/api/rbac/policies/cpps/by-diagram?id=<diagram_id>
-    Ritorna i documenti RBAC CPPS del diagram.
+    Ritorna i documenti RBAC CPPS del diagram, arricchiti con 'service_name'
+    in ogni permission, sia per Activity_* (atomic) sia per Group_* (cpps).
     """
-    diagram_id = request.query_params.get("id") #or request.query_params.get("diagram_id")
+    diagram_id = request.query_params.get("id")
     if not diagram_id:
         return Response({"detail": "diagram_id is mandatory."},
                         status=status.HTTP_400_BAD_REQUEST)
 
+    # 1) Carico i doc CPPS RBAC
     q = {"diagram_id": diagram_id, "service_type": "cpps"}
     docs = list(rbac_collection.find(q))
-    return Response({"count": len(docs), "results": _stringify_ids(docs)}, status=200)
+
+    # 2) Raccogli tutti i service_id che compaiono nelle permissions
+    service_ids = set()
+    for d in docs:
+        for p in (d.get("permissions") or []):
+            sid = (p.get("service") or "").strip()
+            if sid:
+                service_ids.add(sid)
+
+    # Short-circuit: se non ci sono service id, ritorno subito
+    if not service_ids:
+        return Response({"count": len(docs), "results": _stringify_ids(docs)}, status=200)
+
+    # 3) Costruisco una mappa ID -> name risolvendo prima da RBAC (atomic, cpps),
+    #    poi dalle collection funzionali come fallback.
+    name_map: dict[str, str] = {}
+
+    # 3a) Risoluzione nomi da RBAC ATOMIC (atomic_id -> service_name)
+    atomic_cursor = rbac_collection.find(
+        {"diagram_id": diagram_id, "service_type": "atomic", "atomic_id": {"$in": list(service_ids)}},
+        {"atomic_id": 1, "service_name": 1, "_id": 0}
+    )
+    for a in atomic_cursor:
+        name_map[a["atomic_id"]] = a.get("service_name") or a["atomic_id"]
+
+    # 3b) Risoluzione nomi da RBAC CPPS (cpps_id -> service_name), per i Group_*
+    cpps_cursor = rbac_collection.find(
+        {"diagram_id": diagram_id, "service_type": "cpps", "cpps_id": {"$in": list(service_ids)}},
+        {"cpps_id": 1, "service_name": 1, "_id": 0}
+    )
+    for c in cpps_cursor:
+        name_map[c["cpps_id"]] = c.get("service_name") or c["cpps_id"]
+
+    # 3c) Fallback: collezioni funzionali se qualche ID non è ancora risolto
+    missing = service_ids - set(name_map.keys())
+    if missing:
+        # atomic services collection (task_id -> name)
+        from utilities.mongodb_handler import atomic_services_collection, cpps_collection
+        cur_a = atomic_services_collection.find(
+            {"diagram_id": diagram_id, "task_id": {"$in": list(missing)}},
+            {"task_id": 1, "name": 1, "_id": 0}
+        )
+        for a in cur_a:
+            name_map[a["task_id"]] = a.get("name") or a["task_id"]
+
+        # cpps collection (group_id -> name)
+        still = missing - set(name_map.keys())
+        if still:
+            cur_c = cpps_collection.find(
+                {"diagram_id": diagram_id, "group_id": {"$in": list(still)}},
+                {"group_id": 1, "name": 1, "_id": 0}
+            )
+            for c in cur_c:
+                name_map[c["group_id"]] = c.get("name") or c["group_id"]
+
+    # 4) Arricchisco le permissions con 'service_name'
+    enriched = []
+    for d in docs:
+        dd = _stringify_ids(d)
+        for p in (dd.get("permissions") or []):
+            sid = (p.get("service") or "").strip()
+            if sid:
+                p["service_name"] = name_map.get(sid, sid)  # fallback all'ID
+        enriched.append(dd)
+
+    return Response({"count": len(enriched), "results": enriched}, status=200)
+
 
 @api_view(["GET"])
 def get_cpps_one(request):
@@ -215,7 +283,7 @@ def get_cpps_one(request):
     if not doc:
         return Response({"detail": "Policy non trovata."}, status=404)
 
-    # --- lookup nome diagramma (come già avevi) ---
+    # --- lookup nome diagramma ---
     diagram_name = None
     try:
         d = bpmn_collection.find_one({"_id": ObjectId(diagram_id)}, {"name": 1})
@@ -234,26 +302,58 @@ def get_cpps_one(request):
     if payload.get("service_name"):
         payload["cpps_name"] = payload["service_name"]
 
-    # --- NEW: risolvi i nomi delle attività del CPPS ---
+    # --- NEW: risolvi i nomi delle attività/servizi del CPPS (atomic + cpps annidati) ---
     services_ids = sorted({(p.get("service") or "").strip()
                            for p in (doc.get("permissions") or [])
                            if (p.get("service") or "").strip()})
     services_resolved = []
     if services_ids:
-        cursor = rbac_collection.find(
+        name_map = {}
+
+        # Atomic da RBAC
+        cursor_a = rbac_collection.find(
             {"diagram_id": diagram_id, "service_type": "atomic", "atomic_id": {"$in": services_ids}},
             {"atomic_id": 1, "service_name": 1, "_id": 0}
         )
-        # mappa id -> name
-        name_map = {d.get("atomic_id"): (d.get("service_name") or d.get("atomic_id"))
-                    for d in cursor}
+        for d in cursor_a:
+            name_map[d["atomic_id"]] = d.get("service_name") or d["atomic_id"]
+
+        # CPPS annidati da RBAC
+        cursor_c = rbac_collection.find(
+            {"diagram_id": diagram_id, "service_type": "cpps", "cpps_id": {"$in": services_ids}},
+            {"cpps_id": 1, "service_name": 1, "_id": 0}
+        )
+        for d in cursor_c:
+            name_map[d["cpps_id"]] = d.get("service_name") or d["cpps_id"]
+
+        # Fallback: collezioni funzionali
+        from utilities.mongodb_handler import atomic_services_collection, cpps_collection
+        missing = set(services_ids) - set(name_map.keys())
+
+        if missing:
+            cur_a = atomic_services_collection.find(
+                {"diagram_id": diagram_id, "task_id": {"$in": list(missing)}},
+                {"task_id": 1, "name": 1, "_id": 0}
+            )
+            for a in cur_a:
+                name_map[a["task_id"]] = a.get("name") or a["task_id"]
+
+        still = set(services_ids) - set(name_map.keys())
+        if still:
+            cur_c = cpps_collection.find(
+                {"diagram_id": diagram_id, "group_id": {"$in": list(still)}},
+                {"group_id": 1, "name": 1, "_id": 0}
+            )
+            for c in cur_c:
+                name_map[c["group_id"]] = c.get("name") or c["group_id"]
+
         for sid in services_ids:
             services_resolved.append({
                 "service_id": sid,
-                "service_name": name_map.get(sid, sid)  # fallback all’ID se non trovato
+                "service_name": name_map.get(sid, sid)
             })
-    payload["services_resolved"] = services_resolved
 
+    payload["services_resolved"] = services_resolved
     return Response(payload, status=200)
 
 
@@ -353,24 +453,51 @@ def rbac_cppn_view(request):
 
 @api_view(["GET"])
 def get_cppn_by_diagram(request):
-    """
-    GET /editor/api/rbac/policies/cppn/by-diagram?id=<diagram_id>
-    Ritorna i documenti CPPN con permissions filtrate a 'invoke'.
-    """
-    diagram_id = request.query_params.get("id") or request.query_params.get("diagram_id")
+    diagram_id = request.query_params.get("id")
     if not diagram_id:
-        return Response({"detail": "Parametro 'id' (diagram_id) obbligatorio."},
-                        status=status.HTTP_400_BAD_REQUEST)
+        return Response({"detail": "diagram_id is mandatory."}, status=400)
 
     q = {"diagram_id": diagram_id, "service_type": "cppn"}
     docs = list(rbac_collection.find(q))
 
-    # filtra permissions a 'invoke' per ogni documento
+    service_ids = set()
     for d in docs:
-        perms = d.get("permissions") or []
-        d["permissions"] = [p for p in perms if (p or {}).get("permission") == "invoke"]
+        for p in d.get("permissions", []):
+            sid = (p.get("service") or "").strip()
+            if sid:
+                service_ids.add(sid)
 
-    return Response({"count": len(docs), "results": _stringify_ids(docs)}, status=status.HTTP_200_OK)
+    name_map = {}
+    # atomic
+    cur_a = rbac_collection.find(
+        {"diagram_id": diagram_id, "service_type": "atomic", "atomic_id": {"$in": list(service_ids)}},
+        {"atomic_id": 1, "service_name": 1, "_id": 0}
+    )
+    for a in cur_a:
+        name_map[a["atomic_id"]] = a.get("service_name") or a["atomic_id"]
+
+    # cpps
+    cur_c = rbac_collection.find(
+        {"diagram_id": diagram_id, "service_type": "cpps", "cpps_id": {"$in": list(service_ids)}},
+        {"cpps_id": 1, "service_name": 1, "_id": 0}
+    )
+    for c in cur_c:
+        name_map[c["cpps_id"]] = c.get("service_name") or c["cpps_id"]
+
+    # fallback (se vuoi, atomic_services_collection e cpps_collection come in get_cpps_by_diagram)
+
+    enriched = []
+    for d in docs:
+        dd = _stringify_ids(d)
+        for p in dd.get("permissions", []):
+            sid = (p.get("service") or "").strip()
+            if sid:
+                p["service_name"] = name_map.get(sid, sid)
+        enriched.append(dd)
+
+    return Response({"count": len(enriched), "results": enriched}, status=200)
+
+
 
 def rbac_cppn_edit(request, cppn_id):
     return render(request, "editor/rbac_cppn_edit.html", {

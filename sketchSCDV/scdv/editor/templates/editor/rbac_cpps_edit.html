@@ -44,6 +44,12 @@
         </div>
         <div class="col-md-6">
           <label class="form-label">Activities in CPPS</label>
+          <!-- legenda -->
+          <div class="mb-2 small text-muted">
+            <label class="form-label">Legend: </label>
+            <span class="badge bg-info-subtle border border-info text-info-emphasis">Atomic Service</span> &nbsp; | &nbsp;
+            <span class="badge bg-warning-subtle border border-warning text-warning-emphasis">CPPS</span>
+          </div>
           <div id="servicesBox" class="form-control" style="height:auto; min-height:38px; overflow:auto;" readonly></div>
         </div>
       </div>
@@ -79,11 +85,20 @@
     return data.actors || [];
   }
 
-function badge(label, titleAttr){
-  const title = titleAttr ? ` title="${esc(titleAttr)}"` : "";
-  return `<span class="badge bg-light text-body-secondary border"${title}>${esc(label)}</span>`;
-}
+  // badge colorato per atomic/cpps
+  function badge(label, titleAttr, serviceId){
+    const isCPPS   = (serviceId||"").startsWith("Group_");
+    const isAtomic = (serviceId||"").startsWith("Activity_");
 
+    const cls = isCPPS
+      ? "bg-warning-subtle border border-warning text-warning-emphasis"
+      : isAtomic
+        ? "bg-info-subtle border border-info text-info-emphasis"
+        : "bg-light border text-body-secondary";
+
+    const title = titleAttr ? ` title="${esc(titleAttr)}"` : "";
+    return `<span class="badge ${cls}"${title}>${esc(label)}</span>`;
+  }
 
   function readExtraActors(owner){
     return [...document.querySelectorAll(".perm-row select.perm-actor")]
@@ -141,7 +156,6 @@ function badge(label, titleAttr){
   let ACTORS = [];
 
   async function load(){
-    // hidden IDs iniziali
     let diagram_id = document.getElementById("diagram_id").value;
     const cpps_id  = document.getElementById("cpps_id").value;
     const alertHolder = document.getElementById("alertHolder");
@@ -154,7 +168,6 @@ function badge(label, titleAttr){
     }
     const data = await r.json();
 
-    // --- Nomi leggibili dal backend ---
     if (data.diagram_name) {
       const dn = document.getElementById("diagram_name");
       if (dn) dn.value = data.diagram_name;
@@ -166,44 +179,38 @@ function badge(label, titleAttr){
       if (h) h.textContent = `Edit CPPS Policy — ${data.cpps_name || data.service_name}`;
     }
 
-    // Se l'API normalizza gli ID, sincronizza gli hidden
     if (data.diagram_id) {
       document.getElementById("diagram_id").value = data.diagram_id;
-      diagram_id = data.diagram_id; // usa quello normalizzato per le fetch successive
+      diagram_id = data.diagram_id;
     }
 
-    // --- Dati base ---
     document.getElementById("owner").value = data.owner || "";
 
-    // activities list
-      let servicesHtml = '<span class="text-muted">—</span>';
+    // activities list (badge colorati)
+    let servicesHtml = '<span class="text-muted">—</span>';
+    if (Array.isArray(data.services_resolved) && data.services_resolved.length){
+      servicesHtml = data.services_resolved
+        .map(s => badge(s.service_name || s.service_id, s.service_id, s.service_id))
+        .join(" ");
+    } else {
+      const services = Array.from(new Set((data.permissions||[])
+                        .map(p => p.service).filter(Boolean))).sort();
+      if (services.length){
+        servicesHtml = services.map(s => badge(s, s, s)).join(" ");
+      }
+    }
+    document.getElementById("servicesBox").innerHTML = servicesHtml;
 
-if (Array.isArray(data.services_resolved) && data.services_resolved.length){
-  servicesHtml = data.services_resolved
-    .map(s => badge(s.service_name || s.service_id, s.service_id))
-    .join(" ");
-} else {
-  const services = Array.from(new Set((data.permissions||[])
-                    .map(p => p.service).filter(Boolean))).sort();
-  if (services.length){
-    servicesHtml = services.map(s => badge(s)).join(" ");
-  }
-}
-document.getElementById("servicesBox").innerHTML = servicesHtml;
-
-    // attori
     ACTORS = await fetchActors(diagram_id);
 
     const owner = data.owner || "";
     const permsList = document.getElementById("permsList");
     permsList.innerHTML = "";
 
-    // owner row (readonly)
     permsList.insertAdjacentHTML("beforeend",
       permissionRowHTML({rowId: crypto.randomUUID(), actors: ACTORS, actor: owner, readonly:true, ownerActor: owner})
     );
 
-    // extra rows (actors ≠ owner)
     const extraActors = Array.from(new Set((data.permissions||[])
                           .filter(p => p.actor && p.actor !== owner)
                           .map(p => p.actor)));
@@ -217,7 +224,6 @@ document.getElementById("servicesBox").innerHTML = servicesHtml;
     document.getElementById("saveBtn").disabled = false;
   }
 
-  // Add actor (listener unico fuori da load)
   document.getElementById("addPermBtn").addEventListener("click", ()=>{
     const owner = document.getElementById("owner").value.trim();
     const permsList = document.getElementById("permsList");
@@ -228,7 +234,6 @@ document.getElementById("servicesBox").innerHTML = servicesHtml;
 
   load();
 
-  // SAVE
   document.getElementById("saveBtn").addEventListener("click", async (e)=>{
     e.preventDefault();
     const diagram_id = document.getElementById("diagram_id").value.trim();
@@ -247,7 +252,6 @@ document.getElementById("servicesBox").innerHTML = servicesHtml;
     holder.innerHTML = alertHtml('success', 'Permissions updated.');
   });
 </script>
-<!-- Bootstrap Icons (per il trash) -->
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 </body>
 </html>

@@ -14,6 +14,13 @@
     <a href="{% url 'rbac_policies' %}?id={{ request.GET.id }}" class="btn btn-outline-secondary btn-sm">Back</a>
   </div>
 
+  <!-- legenda -->
+  <div class="mb-3 small text-muted">
+    <label class="form-label">Legend: </label>
+    <span class="badge bg-info-subtle border border-info text-info-emphasis">Atomic</span> &nbsp; | &nbsp;
+    <span class="badge bg-warning-subtle border border-warning text-warning-emphasis">CPPS</span>
+  </div>
+
   <div class="card">
     <div class="card-body p-0">
       <div class="table-responsive">
@@ -42,8 +49,28 @@ function buildEditUrl(cppsId, diagramId){
   const base = "{% url 'rbac_cpps_edit' 'CPPS_ID' %}".replace("CPPS_ID", encodeURIComponent(cppsId));
   return `${base}?id=${encodeURIComponent(diagramId)}`;
 }
+
+// badge colorato in base al tipo
+function servicePill(x){
+  const id = x.service || "";
+  const name = x.service_name || id;
+  const isCPPS   = id.startsWith("Group_");
+  const isAtomic = id.startsWith("Activity_");
+
+  const cls = isCPPS
+    ? "bg-warning-subtle border border-warning text-warning-emphasis"
+    : isAtomic
+      ? "bg-info-subtle border border-info text-info-emphasis"
+      : "bg-light border text-body-secondary";
+
+  return `<span class="badge ${cls}" title="${esc(id)}">${esc(name)}</span>`;
+}
+
 function rowHtml(p, diagramId){
-  const perms = (p.permissions||[]).map(x => `${esc(x.actor)}, <code>${esc(x.service)}</code> → <span class="badge bg-success">invoke</span>`).join("<br>") || '—';
+  const perms = (p.permissions||[])
+    .map(x => `${esc(x.actor)}, ${servicePill(x)} → <span class="badge bg-success">invoke</span>`)
+    .join("<br>") || '—';
+
   return `<tr>
     <td><code>${esc(p.service_name)}</code></td>
     <td>${esc(p.owner||'')}</td>
@@ -51,14 +78,20 @@ function rowHtml(p, diagramId){
     <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="${buildEditUrl(p.cpps_id, diagramId)}">Edit</a></td>
   </tr>`;
 }
+
 (async function load(){
   const params = new URLSearchParams(window.location.search);
   const id = params.get("id");
   const tbody = document.getElementById("tbody");
   const r = await fetch(`${API_URL}?id=${encodeURIComponent(id)}`);
-  if(!r.ok){ tbody.innerHTML = `<tr><td colspan="4" class="text-danger text-center py-4">API error</td></tr>`; return; }
+  if(!r.ok){ 
+    tbody.innerHTML = `<tr><td colspan="4" class="text-danger text-center py-4">API error</td></tr>`; 
+    return; 
+  }
   const data = await r.json();
-  const rows = (data.results||[]).map(p=>rowHtml(p,id)).join("") || `<tr><td colspan="4" class="text-center text-muted py-4">Nessun risultato</td></tr>`;
+  const rows = (data.results||[])
+    .map(p=>rowHtml(p,id))
+    .join("") || `<tr><td colspan="4" class="text-center text-muted py-4">Nessun risultato</td></tr>`;
   tbody.innerHTML = rows;
 })();
 </script>

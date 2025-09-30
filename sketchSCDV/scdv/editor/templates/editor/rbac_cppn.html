@@ -16,6 +16,13 @@
     <a href="{% url 'rbac_policies' %}?id={{ request.GET.id }}" class="btn btn-outline-secondary btn-sm">Back</a>
   </div>
 
+  <!-- legenda -->
+  <div class="mb-3 small text-muted">
+    <label class="form-label">Legend: </label>
+    <span class="badge bg-info-subtle border border-info text-info-emphasis">Atomic</span> &nbsp; | &nbsp;
+    <span class="badge bg-warning-subtle border border-warning text-warning-emphasis">CPPS</span>
+  </div>
+
   <div class="card">
     <div class="card-body p-0">
       <div class="table-responsive">
@@ -39,8 +46,7 @@
 </div>
 
 <script>
-  const API_CPPN_BY_DIAGRAM   = "{% url 'rbac_cppn_by_diagram' %}";
-  const API_ATOMIC_BY_DIAGRAM = "{% url 'rbac_atomic_by_diagram' %}";
+  const API_CPPN_BY_DIAGRAM = "{% url 'rbac_cppn_by_diagram' %}";
 
   function esc(s){return (s??'').toString().replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
   function buildEditUrl(cppnId, diagramId){
@@ -48,17 +54,31 @@
     return `${base}?id=${encodeURIComponent(diagramId)}`;
   }
 
-  function rowHtml(p, diagramId, nameMap){
-    const nameOf = id => nameMap[id] || id; // fallback all'id
+  // Badge colorato in base al tipo (prefisso dell'ID)
+  function servicePill(x){
+    const id = x.service || "";
+    const name = x.service_name || id;
+    const isCPPS   = id.startsWith("Group_");
+    const isAtomic = id.startsWith("Activity_");
+    const cls = isCPPS
+      ? "bg-warning-subtle border border-warning text-warning-emphasis"
+      : isAtomic
+        ? "bg-info-subtle border border-info text-info-emphasis"
+        : "bg-light border text-body-secondary";
+    return `<span class="badge ${cls}" title="${esc(id)}">${esc(name)}</span>`;
+  }
+
+  function rowHtml(p, diagramId){
     const actors = (p.actors || []).join(", ");
     const perms = (p.permissions||[])
-      .map(x => `${esc(x.actor)}, <code>${esc(nameOf(x.service))}</code> → ` +
+      .map(x => `${esc(x.actor)}, ${servicePill(x)} → ` +
                 `<span class="badge ${x.permission==='invoke'?'bg-success':'bg-secondary'}">${esc(x.permission)}</span>`)
       .join("<br>") || "—";
 
-    const title = esc(p.service_name || p.cppn_id || "");
+    const titleTxt = esc(p.service_name || p.cppn_name || p.cppn_id || "");
+    const subtitle = p.cppn_id ? ` title="${esc(p.cppn_id)}"` : "";
     return `<tr>
-      <td><code>${title}</code></td>
+      <td><code${subtitle}>${titleTxt}</code></td>
       <td>${esc(actors)}</td>
       <td>${perms}</td>
       <td class="text-end">
@@ -76,25 +96,14 @@
       return;
     }
 
-    // 1) CPPN
     const rC = await fetch(`${API_CPPN_BY_DIAGRAM}?id=${encodeURIComponent(diagramId)}`);
-    if(!rC.ok){ tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger py-4">API error (CPPN)</td></tr>`; return; }
-    const dataC = await rC.json();
-    const cppnList = dataC.results || [];
-
-    // 2) Atomic map (id -> service_name) per mostrare i nomi nelle permissions
-    const nameMap = {};
-    const rA = await fetch(`${API_ATOMIC_BY_DIAGRAM}?id=${encodeURIComponent(diagramId)}`);
-    if (rA.ok){
-      const dataA = await rA.json();
-      for(const a of (dataA.results||[])){
-        if (a.atomic_id) nameMap[a.atomic_id] = a.service_name || a.atomic_id;
-      }
+    if(!rC.ok){
+      const t = await rC.text().catch(()=> "");
+      tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger py-4">API error (CPPN): ${esc(t)}</td></tr>`;
+      return;
     }
-
-    // (Facoltativo) se tra i service ci sono Group_..., puoi mappare anche i CPPS caricandoli e aggiungendo nameMap[group_id] = cpps.service_name
-
-    const rows = cppnList.map(p => rowHtml(p, diagramId, nameMap)).join("")
+    const dataC = await rC.json();
+    const rows = (dataC.results || []).map(p => rowHtml(p, diagramId)).join("")
              || `<tr><td colspan="4" class="text-center text-muted py-4">Nessun documento CPPN</td></tr>`;
     tbody.innerHTML = rows;
   })();
