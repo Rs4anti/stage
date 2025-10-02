@@ -660,35 +660,40 @@ def get_all_services(request):
         'cppn': cppn
     })
 
+from datetime import datetime
+from pymongo import UpdateOne
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+
 @api_view(['DELETE'])
 def delete_group(request, group_id):
     try:
-        # Prova cancellare da CPPS
+        # 1) Prova cancellare CPPS e/o CPPN con lo stesso group_id
+        
         deleted_cpps = cpps_collection.find_one_and_delete({'group_id': group_id})
+        if deleted_cpps:
+            rbac_collection.find_one_and_delete({'cpps_id': group_id})
 
-        # Prova cancellare anche da CPPN
         deleted_cppn = cppn_collection.find_one_and_delete({'group_id': group_id})
-
+        if deleted_cppn:
+            rbac_collection.find_one_and_delete({'cppn_id': group_id})
+            
         deleted_any = bool(deleted_cpps or deleted_cppn)
 
-        # --- Pulizia riferimenti in altri documenti ---
 
-        # rimozione da components e workflow
+        # 2) Pulizia riferimenti in altri documenti (components, workflow, nested_cpps)
         pipeline = [
             { "$set": {
-                # components: rimuovi item con id == group_id (facoltativo filtrare anche per type == "CPPS")
                 "components": {
                     "$filter": {
                         "input": "$components",
                         "as": "c",
                         "cond": { "$ne": ["$$c.id", group_id] }
-                        # Se vuoi essere più stretto:
-                        # "cond": { "$not": { "$and": [ { "$eq": ["$$c.id", group_id] }, { "$eq": ["$$c.type", "CPPS"] } ] } }
                     }
                 }
             }},
             { "$set": {
-                # workflow: elimina la chiave uguale a group_id
                 "workflow": {
                     "$cond": [
                         { "$and": [
@@ -708,7 +713,6 @@ def delete_group(request, group_id):
                                     "as": "w",
                                     "in": {
                                         "k": "$$w.k",
-                                        # rimuove group_id da ogni lista di destinazioni
                                         "v": {
                                             "$cond": [
                                                 { "$isArray": "$$w.v" },
@@ -730,8 +734,6 @@ def delete_group(request, group_id):
                     ]
                 }
             }},
-
-            # rimuovo group_id da nested_cpps (se esiste e se è un array)
             { "$set": {
                 "nested_cpps": {
                     "$cond": [
@@ -749,12 +751,10 @@ def delete_group(request, group_id):
             }}
         ]
 
-        # Applica solo a documenti che potenzialmente contengono riferimenti
         match = {
             "$or": [
                 {"components.id": group_id},
                 {f"workflow.{group_id}": {"$exists": True}},
-                {"workflow": {"$elemMatch": {"$in": [group_id]}}},  # non funziona con object, lascio gli altri due controlli
                 {"nested_cpps": group_id}
             ]
         }
@@ -762,29 +762,70 @@ def delete_group(request, group_id):
         cpps_update = cpps_collection.update_many(match, pipeline)
         cppn_update = cppn_collection.update_many(match, pipeline)
 
-        # 3) Fallback: un pull semplice su nested_cpps per sicurezza
         pull_nested = {"$pull": {"nested_cpps": group_id}}
         cpps_pull = cpps_collection.update_many({"nested_cpps": group_id}, pull_nested)
         cppn_pull = cppn_collection.update_many({"nested_cpps": group_id}, pull_nested)
 
-        if deleted_any:
-            return Response({
-                "message": f"Gruppo {group_id} deleted!",
-                "deleted_from_cpps": bool(deleted_cpps),
-                "deleted_from_cppn": bool(deleted_cppn),
-                "updated_cpps_docs": cpps_update.modified_count,
-                "updated_cppn_docs": cppn_update.modified_count,
-                "pulled_cpps_nested": cpps_pull.modified_count,
-                "pulled_cppn_nested": cppn_pull.modified_count
-            }, status=status.HTTP_200_OK)
+        # 3) Pulizia RBAC COMPOSITE (cpps/cppn) — iterativa
+        rbac_filter = {
+            "service_type": {"$in": ["cpps", "cppn"]},
+            "$or": [
+                {"permissions.service": group_id},
+                {"members": group_id},
+            ]
+        }
 
-        return Response({
-            "error": f"Gruppo {group_id} not found",
+        ops = []
+        docs_scanned = 0
+        perms_removed_total = 0
+        members_removed_total = 0
+
+        for doc in rbac_collection.find(rbac_filter):
+            docs_scanned += 1
+
+            perms = doc.get("permissions", []) or []
+            new_perms = [p for p in perms if p.get("service") != group_id]
+            perms_removed = len(perms) - len(new_perms)
+
+            members = doc.get("members", []) or []
+            new_members = [m for m in members if m != group_id]
+            members_removed = len(members) - len(new_members)
+
+            if perms_removed or members_removed:
+                update = {
+                    "permissions": new_perms,
+                    "members": new_members,
+                    "updated_at": datetime.utcnow(),
+                }
+                # ricalcola actors se presente la chiave
+                if "actors" in doc:
+                    update["actors"] = sorted({p.get("actor") for p in new_perms if p.get("actor")})
+
+                ops.append(UpdateOne({"_id": doc["_id"]}, {"$set": update}))
+
+                perms_removed_total += perms_removed
+                members_removed_total += members_removed
+
+        rbac_modified = 0
+        if ops:
+            bw_res = rbac_collection.bulk_write(ops, ordered=False)
+            rbac_modified = bw_res.modified_count
+
+        payload = {
+            "message": f"Gruppo {group_id} deleted!" if deleted_any else f"Gruppo {group_id} not found",
+            "deleted_from_cpps": bool(deleted_cpps),
+            "deleted_from_cppn": bool(deleted_cppn),
             "updated_cpps_docs": cpps_update.modified_count,
             "updated_cppn_docs": cppn_update.modified_count,
             "pulled_cpps_nested": cpps_pull.modified_count,
-            "pulled_cppn_nested": cppn_pull.modified_count
-        }, status=status.HTTP_404_NOT_FOUND)
+            "pulled_cppn_nested": cppn_pull.modified_count,
+            "rbac_docs_scanned": docs_scanned,
+            "rbac_docs_modified": rbac_modified,
+            "rbac_permissions_removed": perms_removed_total,
+            "rbac_members_removed": members_removed_total,
+        }
+
+        return Response(payload, status=status.HTTP_200_OK if deleted_any else status.HTTP_404_NOT_FOUND)
 
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
