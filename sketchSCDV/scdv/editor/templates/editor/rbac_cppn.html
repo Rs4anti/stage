@@ -29,8 +29,8 @@
         <table class="table table-sm table-hover mb-0">
           <thead class="table-light">
             <tr>
-              <th style="width:26%">CPPN Name/ID</th>
-              <th style="width:20%">Actors (partecipanti)</th>
+              <th style="width:26%">CPPN Name</th>
+              <th style="width:20%">Actors</th>
               <th>Permissions (actor, service → perm)</th>
               <th style="width:10%"></th>
             </tr>
@@ -104,7 +104,7 @@
     }
     const dataC = await rC.json();
     const rows = (dataC.results || []).map(p => rowHtml(p, diagramId)).join("")
-             || `<tr><td colspan="4" class="text-center text-muted py-4">Nessun documento CPPN</td></tr>`;
+             || `<tr><td colspan="4" class="text-center text-muted py-4">No rbac CPPN found!</td></tr>`;
     tbody.innerHTML = rows;
   })();
 </script>

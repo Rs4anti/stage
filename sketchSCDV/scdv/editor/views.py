@@ -808,49 +808,48 @@ def add_nested_cpps(request, group_id):
     return Response({'status': 'nested_cpps updated'})
 
 
+from datetime import datetime
+from pymongo import UpdateOne
+
 @api_view(['DELETE'])
 def delete_atomic(request, atomic_id):
     try:
-        # Elimino atomic dalla sua collection
+        # 1) Cancello l'atomic e la sua RBAC specifica (se presente)
         deleted = atomic_services_collection.find_one_and_delete({'task_id': atomic_id})
+        rbac_deleted = rbac_collection.find_one_and_delete({'atomic_id': atomic_id})
         if not deleted:
             return Response({'error': 'Atomic service not found'}, status=404)
 
-        # Pipeline che:
-        # - filtra components rimuovendo gli item con id == atomic_id
-        # - rimuove la chiave di workflow == atomic_id
-        # - rimuove atomic_id da TUTTE le liste di workflow
-        pipeline = [
-            { "$set": {
+        # 2) Pulizia CPPS/CPPN (components + workflow) — tua pipeline originale
+        pipeline_cpps_cppn = [
+            {"$set": {
                 "components": {
                     "$filter": {
                         "input": "$components",
                         "as": "c",
-                        "cond": { "$ne": ["$$c.id", atomic_id] }
+                        "cond": {"$ne": ["$$c.id", atomic_id]}
                     }
                 }
             }},
-            { "$set": {
+            {"$set": {
                 "workflow": {
                     "$arrayToObject": {
                         "$map": {
                             "input": {
-                                # toglie eventuale entry con chiave == atomic_id
                                 "$filter": {
-                                    "input": { "$objectToArray": "$workflow" },
+                                    "input": {"$objectToArray": "$workflow"},
                                     "as": "w",
-                                    "cond": { "$ne": ["$$w.k", atomic_id] }
+                                    "cond": {"$ne": ["$$w.k", atomic_id]}
                                 }
                             },
                             "as": "w",
                             "in": {
                                 "k": "$$w.k",
-                                # rimuove atomic_id da ogni lista destinazioni
                                 "v": {
                                     "$filter": {
                                         "input": "$$w.v",
                                         "as": "t",
-                                        "cond": { "$ne": ["$$t", atomic_id] }
+                                        "cond": {"$ne": ["$$t", atomic_id]}
                                     }
                                 }
                             }
@@ -859,17 +858,66 @@ def delete_atomic(request, atomic_id):
                 }
             }}
         ]
+        cpps_result = cpps_collection.update_many({}, pipeline_cpps_cppn)
+        cppn_result = cppn_collection.update_many({}, pipeline_cpps_cppn)
 
-        # Applicazione la pipeline a TUTTI i doc
-        cpps_result = cpps_collection.update_many({}, pipeline)
-        cppn_result = cppn_collection.update_many({}, pipeline)
+        # 3) Pulizia RBAC (cpps/cppn) ITERATIVA: rimuovi tutte le triple con service == atomic_id
+        #    e l'atomic_id da members[]; ricalcola actors dalle permission rimaste.
+        rbac_filter = {
+            "service_type": {"$in": ["cpps", "cppn"]},
+            "$or": [
+                {"permissions.service": atomic_id},
+                {"members": atomic_id},
+            ]
+        }
+
+        ops = []
+        docs_scanned = 0
+        docs_modified = 0
+        perms_removed_total = 0
+        members_removed_total = 0
+
+        for doc in rbac_collection.find(rbac_filter):
+            docs_scanned += 1
+
+            perms = doc.get("permissions", []) or []
+            new_perms = [p for p in perms if p.get("service") != atomic_id]
+            perms_removed = len(perms) - len(new_perms)
+
+            members = doc.get("members", []) or []
+            new_members = [m for m in members if m != atomic_id]
+            members_removed = len(members) - len(new_members)
+
+            if perms_removed or members_removed:
+                update = {
+                    "permissions": new_perms,
+                    "members": new_members,
+                    "updated_at": datetime.utcnow(),
+                }
+
+                # Se il documento ha la chiave actors, ricalcolala dalle permission rimaste
+                if "actors" in doc:
+                    new_actors = sorted({p.get("actor") for p in new_perms if p.get("actor")})
+                    update["actors"] = new_actors
+
+                ops.append(UpdateOne({"_id": doc["_id"]}, {"$set": update}))
+                perms_removed_total += perms_removed
+                members_removed_total += members_removed
+
+        if ops:
+            bw_res = rbac_collection.bulk_write(ops, ordered=False)
+            docs_modified = bw_res.modified_count
 
         return Response({
             "status": "deleted",
             "removed_from_cpps": cpps_result.modified_count,
-            "removed_from_cppn": cppn_result.modified_count
-        }, status=200)  
-    
+            "removed_from_cppn": cppn_result.modified_count,
+            "rbac_docs_scanned": docs_scanned,
+            "rbac_docs_modified": docs_modified,
+            "rbac_permissions_removed": perms_removed_total,
+            "rbac_members_removed": members_removed_total,
+        }, status=200)
+
     except Exception as e:
         print(f"Error during atomic delete: {e}")
         return Response({"error": str(e)}, status=500)

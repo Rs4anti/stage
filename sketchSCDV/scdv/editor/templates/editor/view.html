@@ -68,16 +68,16 @@
   </div>
 
   <!--Rbac policies button-->
-  <div class="mt-4">
-        <a href="{% url 'rbac_policies' %}?id={{ request.GET.id }}"
-      class="btn btn-outline-primary">
-      <i class="bi bi-shield-lock"></i> RBAC Policies
-  </a>
-  </div>
+    {% if request and request.GET.id %}
+      <div class="mt-4">
+        <a href="{% url 'rbac_policies' %}?id={{ request.GET.id|urlencode }}"
+          class="btn btn-outline-primary">
+          <i class="bi bi-shield-lock"></i> RBAC Policies
+        </a>
+      </div>
+    {% endif %}
+
 </aside>
-
-
-
 
     <main class="col-10 p-3">
       <div id="canvas"></div>

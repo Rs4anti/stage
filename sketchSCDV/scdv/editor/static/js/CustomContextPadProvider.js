@@ -74,7 +74,7 @@ function CustomContextPadProvider(config, contextPad, modeling, translate) {
             fetch(`/editor/api/atomic_service/${element.id}/`)
               .then(response => {
                 if (!response.ok) {
-                  throw new Error(`Atomic non trovato (${response.status})`);
+                  throw new Error(`Atomic not found (${response.status})`);
                 }
                 return response.json();
               })
@@ -113,8 +113,8 @@ function CustomContextPadProvider(config, contextPad, modeling, translate) {
                 }
               })
               .then(data => {
-                nameEl.innerText = data.name || '(senza nome)';
-                descEl.innerText = data.description || '(nessuna descrizione)';
+                nameEl.innerText = data.name || '(no name)';
+                descEl.innerText = data.description || '(no description)';
                 new bootstrap.Modal(modalEl).show();
               })
               .catch(error => {

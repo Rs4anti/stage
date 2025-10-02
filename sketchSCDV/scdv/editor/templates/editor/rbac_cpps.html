@@ -91,7 +91,7 @@ function rowHtml(p, diagramId){
   const data = await r.json();
   const rows = (data.results||[])
     .map(p=>rowHtml(p,id))
-    .join("") || `<tr><td colspan="4" class="text-center text-muted py-4">Nessun risultato</td></tr>`;
+    .join("") || `<tr><td colspan="4" class="text-center text-muted py-4">No rbac cpps found!</td></tr>`;
   tbody.innerHTML = rows;
 })();
 </script>

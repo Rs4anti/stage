@@ -40,12 +40,14 @@ async function loadDiagramList() {
     const row = document.createElement('tr');
     const viewUrl = `/viewer/by-name/${encodeURIComponent(d.name)}/`;
     const editUrl = `/editor/?id=${d.id}`;
+    const rbacUrl = `/editor/policies?id=${d.id}`;
 
     row.innerHTML = `
       <td>${d.name}</td>
       <td class="text-center">
         <a href="${viewUrl}" class="btn btn-sm btn-info me-2">View</a>
         <button class="btn btn-sm btn-warning me-2" onclick="window.location.href='${editUrl}'">Edit</button>
+        <button class="btn btn-sm btn-warning me-2" onclick="window.location.href='${rbacUrl}'">Rbac policies</button>
         <button class="btn btn-sm btn-secondary" onclick="exportDiagram('${d.id}')">Download</button>
         <button class="btn btn-sm btn-danger" onclick="deleteFullDiagram('${d.id}')">Delete</button>
       </td>
