@@ -1,4 +1,4 @@
-# SketchSCDV
+# SCDV Modeller
 
 Web application based on **Django** for modeling and visualization of
 **Supply Chain Data View (SCDV)**.\
