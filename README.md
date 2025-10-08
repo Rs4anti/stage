@@ -13,22 +13,14 @@ model](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5166945).
 ### 1. Clone the repository
 
 ``` bash
-git clone https://github.com/Rs4anti/stage
+git clone https://github.com/Rs4anti/SCDV_Modeller
 ```
 
 or download the repo **zip** file and extract it.
 
 ------------------------------------------------------------------------
 
-### 2. Move into the main folder
-
-``` bash
-cd sketchSCDV
-```
-
-------------------------------------------------------------------------
-
-### 3. Create a Python virtual environment (optional but recommended)
+### 2. Create a Python virtual environment (optional but recommended)
 
 ``` bash
 python -m venv .venv
@@ -36,7 +28,7 @@ python -m venv .venv
 
 ------------------------------------------------------------------------
 
-### 4. Activate the virtual environment
+### 3. Activate the virtual environment
 
 -   **Linux/MacOS**:
 
@@ -52,7 +44,7 @@ python -m venv .venv
 
 ------------------------------------------------------------------------
 
-### 5. Install dependencies
+### 4. Install dependencies
 
 ``` bash
 pip install -r requirements.txt
@@ -60,7 +52,7 @@ pip install -r requirements.txt
 
 ------------------------------------------------------------------------
 
-### 6. Enter the project directory
+### 5. Enter the project directory
 
 ``` bash
 cd scdv
